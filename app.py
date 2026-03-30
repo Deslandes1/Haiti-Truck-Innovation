@@ -1,203 +1,139 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-# --- PRO credentials & System Info ---
-COMPANY = "EduHumanity"
-GAME_NAME = "Haiti Truck Innovation"
+# --- MANDATORY CREDENTIALS ---
 OWNER = "Gesner Deslandes"
+COMPANY = "EduHumanity"
 EMAIL = "deslandes78@gmail.com"
 PHONE = "(509)-47385663"
-VERSION = "2026.10 PRO"
 
 st.set_page_config(page_title="Haiti Truck Innovation PRO", layout="wide")
 
-# --- THE STURDY 3D SIMULATION ENGINE ---
-# We use a refined Three.js setup to handle complex geometry like text textures.
+# --- RACING WORLD ENGINE ---
 sim_html = f"""
 <!DOCTYPE html>
 <html>
 <head>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
-        body {{ margin: 0; background: #87CEEB; overflow: hidden; font-family: 'Arial Black', sans-serif; }}
-        #hud {{ 
-            position: absolute; top: 20px; right: 20px; 
-            background: rgba(0,0,0,0.85); padding: 25px; border-radius: 12px; 
-            color: white; border-top: 8px solid #D21034; pointer-events: none;
-            min-width: 250px;
+        body {{ margin: 0; background: #050505; overflow: hidden; font-family: 'Arial Black', sans-serif; }}
+        #info-panel {{ 
+            position: absolute; top: 15px; left: 15px; 
+            background: rgba(0,32,159,0.9); padding: 15px; border-radius: 5px; 
+            color: white; border-bottom: 4px solid #D21034; z-index: 10;
         }}
-        #start-btn {{
-            position: absolute; width: 100%; height: 100%; background: rgba(0,0,0,0.95);
-            color: white; display: flex; flex-direction: column; justify-content: center;
-            align-items: center; z-index: 9999; cursor: pointer; text-align: center;
+        #speed-hud {{
+            position: absolute; bottom: 30px; right: 30px;
+            color: #00FF41; font-size: 80px; text-shadow: 2px 2px #000;
         }}
-        .stat {{ color: #00FF41; font-weight: bold; }}
+        #click-to-play {{
+            position: absolute; width:100%; height:100%; background: rgba(0,0,0,0.8);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            color: white; z-index: 100; cursor: pointer;
+        }}
     </style>
 </head>
 <body>
-    <div id="start-btn" onclick="this.style.display='none'; init();">
-        <h1 style="color:#00209F; font-size: 60px;">🇭🇹 {GAME_NAME}</h1>
-        <p style="font-size: 20px; margin-top:0;">[ CLICK TO IGNITE DIESEL ENGINE & DEPLOY ]</p>
-        <p style="font-size: 10px; color: #555;">Version {VERSION}</p>
+    <div id="click-to-play" onclick="this.style.display='none'; init();">
+        <h1 style="color:#D21034; font-size:50px;">🇭🇹 {COMPANY} RACING</h1>
+        <p>CLICK TO DEPLOY TRUCK & START ENGINE SOUND</p>
     </div>
 
-    <div id="hud">
-        <div style="font-size: 18px; border-bottom: 2px solid #444; padding-bottom: 8px; margin-bottom: 12px; letter-spacing: 1px;">
-            OPERATOR: <b>{OWNER}</b>
-        </div>
-        <div>System: <span class="stat">{GAME_NAME}</span></div>
-        <div>Credentials: <span class="stat">{EMAIL}</span></div>
-        <div>WhatsApp: <span class="stat">{PHONE}</span></div>
-        <hr>
-        <div style="font-size: 35px; text-align: center; color: #fff; text-shadow: 2px 2px #000;">
-            <span id="sp">0</span> <span style="font-size: 16px;">MPH</span>
-        </div>
+    <div id="info-panel">
+        <div style="font-size: 18px; font-weight: bold;">{OWNER}</div>
+        <div style="font-size: 12px; color: #ccc;">Founder of {COMPANY}</div>
+        <div style="font-size: 12px;">{EMAIL}</div>
+        <div style="font-size: 12px;">WhatsApp: {PHONE}</div>
     </div>
+
+    <div id="speed-hud"><span id="sp">00</span><span style="font-size:20px;"> MPH</span></div>
 
     <script>
-        let scene, camera, renderer, truck, tires = [], speed = 0, angle = 0, keys = {{}};
-        let audioCtx, oscillator, gainNode;
-
-        function initAudio() {{
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            oscillator = audioCtx.createOscillator();
-            gainNode = audioCtx.createGain();
-            oscillator.type = 'sawtooth'; // Heavy diesel rumble shape
-            oscillator.frequency.setValueAtTime(38, audioCtx.currentTime); 
-            gainNode.gain.setValueAtTime(0.06, audioCtx.currentTime);
-            oscillator.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-            oscillator.start();
-        }}
+        let scene, camera, renderer, truck, wheels = [], roadSegments = [], speed = 0, angle = 0, keys = {{}};
+        let audioCtx, osc;
 
         function init() {{
-            initAudio();
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x87CEEB);
-            scene.fog = new THREE.Fog(0x87CEEB, 100, 750);
+            // Audio setup for diesel engine
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            osc = audioCtx.createOscillator();
+            let gain = audioCtx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(45, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start();
 
-            camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 1, 2500);
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a0a0a); // Dark racing sky
+            scene.fog = new THREE.Fog(0x0a0a0a, 50, 500);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 1, 1000);
             renderer = new THREE.WebGLRenderer({{ antialias: true }});
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
-            scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-            const sun = new THREE.DirectionalLight(0xffffff, 1.3);
-            sun.position.set(150, 200, 100);
+            scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+            let sun = new THREE.DirectionalLight(0xffffff, 1);
+            sun.position.set(10, 50, 10);
             scene.add(sun);
 
-            // --- THE LANDSCAPE (End the Void) ---
-            // Grass Plains
-            const grass = new THREE.Mesh(new THREE.PlaneGeometry(10000, 10000), new THREE.MeshPhongMaterial({{color: 0x348C31}}));
-            grass.rotation.x = -Math.PI / 2;
-            scene.add(grass);
+            // --- THE RACING LANDSCAPE ---
+            for(let i=0; i<40; i++) {{
+                let seg = new THREE.Group();
+                // Asphalt
+                let road = new THREE.Mesh(new THREE.PlaneGeometry(60, 40), new THREE.MeshPhongMaterial({{color: 0x111111}}));
+                road.rotation.x = -Math.PI/2;
+                seg.add(road);
 
-            // Asphalt Road with Markings
-            const road = new THREE.Mesh(new THREE.PlaneGeometry(60, 20000), new THREE.MeshPhongMaterial({{color: 0x222222}}));
-            road.rotation.x = -Math.PI / 2;
-            road.position.y = 0.1;
-            scene.add(road);
+                // Racing Curbs (Red/White)
+                let curbL = new THREE.Mesh(new THREE.PlaneGeometry(8, 40), new THREE.MeshBasicMaterial({{color: i%2==0 ? 0xD21034 : 0xffffff}}));
+                curbL.rotation.x = -Math.PI/2;
+                curbL.position.set(-34, 0.2, 0);
+                seg.add(curbL);
 
-            for(let i=0; i<300; i++) {{
-                const line = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 14), new THREE.MeshBasicMaterial({{color: 0xFFD700}}));
-                line.rotation.x = -Math.PI / 2;
-                line.position.set(0, 0.2, -i * 60);
-                scene.add(line);
+                let curbR = curbL.clone();
+                curbR.position.set(34, 0.2, 0);
+                seg.add(curbR);
+
+                seg.position.z = -i * 40;
+                scene.add(seg);
+                roadSegments.push(seg);
             }}
 
-            // --- THE HIGH-DETAIL 18-WHEELER ---
+            // --- THE SEMI-TRUCK ---
             truck = new THREE.Group();
+            let bodyMat = new THREE.MeshPhongMaterial({{color: 0x00209F}}); // Blue Cab
             
-            // The Conventional "Long Nose" Cab (Blue)
-            const bodyMat = new THREE.MeshPhongMaterial({{color: 0x00209F, shininess: 90}});
-            
-            const nose = new THREE.Mesh(new THREE.BoxGeometry(3.6, 3.2, 5.5), bodyMat);
-            nose.position.set(0, 1.6, 6);
+            // Long Nose
+            let nose = new THREE.Mesh(new THREE.BoxGeometry(3.5, 3, 6), bodyMat);
+            nose.position.set(0, 1.5, 5);
             truck.add(nose);
 
-            const cab = new THREE.Mesh(new THREE.BoxGeometry(4.2, 5.5, 5), bodyMat);
-            cab.position.set(0, 2.75, 1);
+            let cab = new THREE.Mesh(new THREE.BoxGeometry(4, 5.5, 5), bodyMat);
+            cab.position.set(0, 2.75, 0);
             truck.add(cab);
 
-            // Chrome Details (Grill, Pipes)
-            const grillMat = new THREE.MeshPhongMaterial({{color: 0xaaaaaa, shininess:120}});
-            const grill = new THREE.Mesh(new THREE.BoxGeometry(3.4, 3, 0.2), grillMat);
-            grill.position.set(0, 1.5, 8.8);
-            truck.add(grill);
-
-            const stackGeo = new THREE.CylinderGeometry(0.2, 0.2, 8);
-            const chromeMat = new THREE.MeshPhongMaterial({{color: 0xeeeeee, shininess:150}});
-            const s1 = new THREE.Mesh(stackGeo, chromeMat); s1.position.set(1.7, 5, 0.5);
-            const s2 = new THREE.Mesh(stackGeo, chromeMat); s2.position.set(-1.7, 5, 0.5);
-            truck.add(s1); truck.add(s2);
-
-            // HAITIAN FLAG
-            const flagGeo = new THREE.PlaneGeometry(1.5, 0.9);
-            // Simulating flag with red/blue bands and center coat of arms
-            const flagMat = new THREE.MeshBasicMaterial({{color: 0x00209F, emissive: 0xD21034, emissiveIntensity: 0.2}});
-            const flag = new THREE.Mesh(flagGeo, flagMat);
-            flag.position.set(2.11, 4.5, 2);
-            flag.rotation.y = Math.PI / 2;
+            // Haitian Flag (Side of Cab)
+            let flag = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1), new THREE.MeshBasicMaterial({{color: 0xD21034}}));
+            flag.position.set(2.05, 4.5, 1);
+            flag.rotation.y = Math.PI/2;
             truck.add(flag);
 
-            // WHEELS (Tires) with Visible Structure
-            const tireGeo = new THREE.CylinderGeometry(1.2, 1.2, 1, 16);
-            const tireMat = new THREE.MeshPhongMaterial({{color: 0x111111}});
-            const hubMat = new THREE.MeshPhongMaterial({{color: 0x777777, shininess:100}});
-            
-            // Function to build a wheel assembly
-            function createWheel(pos) {{
-                let tire = new THREE.Mesh(tireGeo, tireMat);
-                let hub = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1.1, 8), hubMat);
-                tire.add(hub); // Hub spins with tire
-                tire.rotation.z = Math.PI / 2;
-                tire.position.set(pos[0], pos[1], pos[2]);
-                truck.add(tire);
-                tires.push(tire); // Add to spin animation list
-            }}
+            // Visible tires
+            let tireGeo = new THREE.CylinderGeometry(1.2, 1.2, 1, 12);
+            let tireMat = new THREE.MeshPhongMaterial({{color: 0x000000}});
+            [[-2,1,4],[2,1,4], [-2,1,0],[2,1,0], [-2,1,-12],[2,1,-12]].forEach(p => {{
+                let t = new THREE.Mesh(tireGeo, tireMat);
+                t.rotation.z = Math.PI/2;
+                t.position.set(p[0], p[1], p[2]);
+                truck.add(t);
+                wheels.push(t);
+            }});
 
-            const tirePositions = [
-                [2, 1, 3.5], [-2, 1, 3.5], // Front
-                [2, 1, 0], [-2, 1, 0],     // Drive 1
-                [2, 1, -2.5], [-2, 1, -2.5], // Drive 2
-                [2, 1, -13], [-2, 1, -13], // Trailer 1
-                [2, 1, -15.5], [-2, 1, -15.5] // Trailer 2
-            ];
-            tirePositions.forEach(pos => createWheel(pos));
-
-            // THE TRAILER (With Text Branding)
-            const trailerGroup = new THREE.Group();
-            
-            // Standard 53' Reefer Box (White for best text contrast)
-            const trailerMat = new THREE.MeshPhongMaterial({{color: 0xEEEEEE, shininess: 40}});
-            const trailer = new THREE.Mesh(new THREE.BoxGeometry(4.2, 6, 28), trailerMat);
-            trailerGroup.add(trailer);
-
-            // text BRANDING (Haiti Truck Innovation)
-            // We use a canvas texture because browsers handle rendering text onto textures efficiently.
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            canvas.width = 1024; canvas.height = 256;
-            context.fillStyle = '#EEEEEE'; context.fillRect(0, 0, canvas.width, canvas.height); // Matches trailer
-            context.font = 'Bold 80px Impact'; context.fillStyle = '#00209F'; // Haiti Blue Text
-            context.textAlign = 'center'; context.fillText("HAITI TRUCK INNOVATION", 512, 128);
-            
-            const textTexture = new THREE.CanvasTexture(canvas);
-            const textMat = new THREE.MeshBasicMaterial({{map: textTexture, transparent: true}});
-            
-            const brandingGeo = new THREE.PlaneGeometry(16, 4);
-            // Driver side text
-            const brandingL = new THREE.Mesh(brandingGeo, textMat);
-            brandingL.position.set(2.11, 0, -2); brandingL.rotation.y = Math.PI / 2;
-            trailerGroup.add(brandingL);
-            
-            // Passenger side text
-            const brandingR = new THREE.Mesh(brandingGeo, textMat);
-            brandingR.position.set(-2.11, 0, -2); brandingR.rotation.y = -Math.PI / 2;
-            trailerGroup.add(brandingR);
-
-            trailerGroup.position.set(0, 4.25, -12);
-            truck.add(trailerGroup);
+            // White Trailer
+            let trailer = new THREE.Mesh(new THREE.BoxGeometry(4.2, 6, 28), new THREE.MeshPhongMaterial({{color: 0xffffff}}));
+            trailer.position.set(0, 4, -13);
+            truck.add(trailer);
 
             scene.add(truck);
             animate();
@@ -210,38 +146,26 @@ sim_html = f"""
             requestAnimationFrame(animate);
             if(!truck) return;
 
-            // HEAVY TRUCK PHYSICS
-            // Start slow (inertia) and need space to stop.
-            if (keys['ArrowUp'] || keys['KeyW']) speed += 0.0007; 
-            if (keys['ArrowDown'] || keys['KeyS']) speed -= 0.001;
-            if (keys['Enter']) speed *= 0.94; // Air Brakes
+            if (keys['ArrowUp']) speed += 0.0015; 
+            if (keys['ArrowDown']) speed -= 0.002;
+            speed *= 0.992; // Friction
 
-            speed *= 0.995; // Rolling Resistance
-            
-            if (Math.abs(speed) > 0.001) {{
-                if (keys['ArrowLeft'] || keys['KeyA']) angle += 0.012;
-                if (keys['ArrowRight'] || keys['KeyD']) angle -= 0.012;
-            }}
+            // Ground movement logic
+            roadSegments.forEach(seg => {{
+                seg.position.z += speed * 150; 
+                if(seg.position.z > 100) seg.position.z -= 40 * 40;
+            }});
 
-            truck.rotation.y = angle;
-            truck.position.x += Math.sin(angle) * speed * 75;
-            truck.position.z += Math.cos(angle) * speed * 75;
+            // Wheel Spin
+            wheels.forEach(w => w.rotation.x += speed * 5);
 
-            // SPIN TIRES
-            tires.forEach(t => t.rotation.x += speed * 1.5);
+            // Engine Pitch
+            if(osc) osc.frequency.setTargetAtTime(45 + (speed * 1200), audioCtx.currentTime, 0.1);
 
-            // ENGINE AUDIO SYNC
-            if(oscillator) {{
-                let pitch = 38 + (Math.abs(speed) * 850);
-                oscillator.frequency.setTargetAtTime(pitch, audioCtx.currentTime, 0.1);
-            }}
+            camera.position.set(0, 20, 60);
+            camera.lookAt(0, 5, 0);
 
-            // FOLLOW CAMERA (Console Game Style)
-            camera.position.set(truck.position.x - Math.sin(angle)*60, 25, truck.position.z - Math.cos(angle)*60);
-            camera.lookAt(truck.position.x, 6, truck.position.z);
-
-            // UPDATE HUD
-            document.getElementById('sp').innerText = Math.round(Math.abs(speed * 1600));
+            document.getElementById('sp').innerText = Math.round(speed * 2000);
             renderer.render(scene, camera);
         }}
     </script>
