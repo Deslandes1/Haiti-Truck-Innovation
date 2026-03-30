@@ -1,14 +1,14 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-# --- CREDENTIALS ---
+# --- OWNER & PROJECT DATA ---
 OWNER = "Gesner Deslandes"
 COMPANY = "EduHumanity"
 CONTACT = "(509)-47385663"
 
-st.set_page_config(page_title="Haiti Truck Innovation PRO", layout="wide")
+st.set_page_config(page_title="Haiti Truck Pro - Realistic Driver", layout="wide")
 
-# --- HIGH-VISIBILITY LANDSCAPE ENGINE ---
+# --- REAL-WORLD SIMULATION ENGINE ---
 sim_html = f"""
 <!DOCTYPE html>
 <html>
@@ -19,21 +19,18 @@ sim_html = f"""
         
         #gui {{
             position: absolute; top: 20px; left: 20px; 
-            display: flex; flex-direction: column; gap: 12px; z-index: 100;
+            display: flex; flex-direction: column; gap: 10px; z-index: 100;
         }}
         .btn {{
-            padding: 15px 25px; background: #00209F; color: white; border: 2px solid white;
-            cursor: pointer; font-weight: bold; border-radius: 8px; text-shadow: 1px 1px #000;
+            padding: 12px 20px; background: #D21034; color: white; border: 2px solid #fff;
+            cursor: pointer; font-weight: bold; border-radius: 5px; box-shadow: 2px 2px 10px rgba(0,0,0,0.5);
         }}
-        .btn:hover {{ background: #D21034; }}
-
         #dashboard {{
             position: absolute; bottom: 0; width: 100%; height: 160px;
-            background: #222; border-top: 5px solid #444;
+            background: #1a1a1a; border-top: 5px solid #333;
             display: flex; justify-content: space-around; align-items: center;
-            color: #00FF41; font-family: monospace; z-index: 10;
+            color: #00FF41; z-index: 10;
         }}
-
         #start-screen {{
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.95); display: flex; flex-direction: column;
@@ -46,160 +43,161 @@ sim_html = f"""
 
     <div id="start-screen" onclick="this.style.display='none'; init();">
         <h1 style="color:#D21034; font-size:50px; margin:0;">🇭🇹 {COMPANY}</h1>
-        <h2 style="color:#FFD700;">LANDSCAPE & TRUCK RESTORATION</h2>
-        <p style="font-size:18px;">CLICK ANYWHERE TO ENTER THE WORLD</p>
-        <p style="margin-top:20px;">[UP] GAS | [LEFT/RIGHT] STEER | [V] VIEW | [N] TIME</p>
+        <h2 style="color:#FFD700;">REALISTIC DRIVER & SOUND SIMULATOR</h2>
+        <p style="font-size:18px;">CLICK TO START THE DIESEL ENGINE</p>
     </div>
 
     <div id="gui">
-        <button class="btn" onclick="toggleView()">SELECT VIEW (V)</button>
+        <button class="btn" onclick="toggleView()">TOGGLE VIEW (V)</button>
         <button class="btn" onclick="toggleTime()">DAY / NIGHT (N)</button>
     </div>
 
     <div id="dashboard">
-        <div style="text-align:center;">
-            SPEED<br><span id="speed-val" style="font-size:40px;">0</span> MPH
-        </div>
-        <div style="text-align:center; color:white;">
-            <b>{OWNER}</b><br>
-            <span id="mode-txt" style="color:#FFD700;">CABIN MODE</span>
-        </div>
-        <div style="text-align:center;">
-            FUEL<br><span style="font-size:30px; color:#D21034;">100%</span>
-        </div>
+        <div style="text-align:center;">SPEED<br><span id="speed-val" style="font-size:40px;">0</span> MPH</div>
+        <div style="text-align:center; color:white;"><b>{OWNER}</b><br><span id="mode-txt">CABIN MODE</span></div>
+        <div style="text-align:center;">GEAR<br><span id="gear-val" style="font-size:30px;">N</span></div>
     </div>
 
     <script>
-        let scene, camera, renderer, truck, steeringWheel, roadSegments = [];
+        let scene, camera, renderer, truck, steeringWheel, hands, roadSegments = [];
         let speed = 0, truckX = 0, targetX = 0, time = 0, keys = {{}};
         let isNight = false, isCabin = true;
+        let audioCtx, osc, gainNode;
 
         function init() {{
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x87CEEB); // Day Sky
-            scene.fog = new THREE.Fog(0x87CEEB, 1000, 6000);
+            // AUDIO SYSTEM
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            osc = audioCtx.createOscillator();
+            gainNode = audioCtx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(20, audioCtx.currentTime);
+            gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+            osc.connect(gainNode); gainNode.connect(audioCtx.destination);
+            osc.start();
 
-            camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 15000);
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB);
+            scene.fog = new THREE.Fog(0x87CEEB, 1000, 5000);
+
+            camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 1, 10000);
             
             renderer = new THREE.WebGLRenderer({{ antialias: true }});
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
-            // Lighting for visibility
-            const ambient = new THREE.AmbientLight(0xffffff, 0.7);
-            scene.add(ambient);
             const sun = new THREE.DirectionalLight(0xffffff, 1.2);
             sun.position.set(100, 1000, 100);
             scene.add(sun);
-            scene.sun = sun;
+            scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 
-            // --- THE TRUCK (REPAIRED) ---
+            // --- TRUCK MODEL ---
             truck = new THREE.Group();
             let bodyMat = new THREE.MeshPhongMaterial({{color: 0x00209F}});
-            let cab = new THREE.Mesh(new THREE.BoxGeometry(10, 12, 12), bodyMat);
-            cab.position.y = 6;
+            let cab = new THREE.Mesh(new THREE.BoxGeometry(12, 14, 15), bodyMat);
+            cab.position.y = 7;
             truck.add(cab);
-            
-            let trailer = new THREE.Mesh(new THREE.BoxGeometry(10, 14, 50), new THREE.MeshPhongMaterial({{color: 0xffffff}}));
-            trailer.position.set(0, 7, 35);
+            let trailer = new THREE.Mesh(new THREE.BoxGeometry(12, 16, 55), new THREE.MeshPhongMaterial({{color: 0xeeeeee}}));
+            trailer.position.set(0, 8, 40);
             truck.add(trailer);
             scene.add(truck);
 
-            // --- THE STEERING WHEEL ---
+            // --- STEERING WHEEL & HANDS ---
             steeringWheel = new THREE.Group();
-            let wheelRing = new THREE.Mesh(new THREE.TorusGeometry(4, 0.6, 16, 100), new THREE.MeshPhongMaterial({{color: 0x111111}}));
+            let wheelRing = new THREE.Mesh(new THREE.TorusGeometry(4.5, 0.7, 16, 100), new THREE.MeshPhongMaterial({{color: 0x111111}}));
             steeringWheel.add(wheelRing);
-            steeringWheel.position.set(0, 10, -5);
-            steeringWheel.rotation.x = Math.PI/3;
+            
+            // SIMULATED HANDS
+            hands = new THREE.Group();
+            let handMat = new THREE.MeshPhongMaterial({{color: 0x5c4033}}); // Driver skin tone
+            let leftHand = new THREE.Mesh(new THREE.CapsuleGeometry(1, 4, 4, 8), handMat);
+            leftHand.position.set(-4.5, 0, 1);
+            let rightHand = leftHand.clone();
+            rightHand.position.set(4.5, 0, 1);
+            hands.add(leftHand); hands.add(rightHand);
+            steeringWheel.add(hands);
+
+            steeringWheel.position.set(0, 10, -8);
+            steeringWheel.rotation.x = Math.PI/3.5;
             scene.add(steeringWheel);
 
-            // --- THE LANDSCAPE & ROAD ---
-            const grassMat = new THREE.MeshPhongMaterial({{color: 0x2d5a27}});
-            const roadMat = new THREE.MeshPhongMaterial({{color: 0x333333}});
-            
-            for(let i=0; i<200; i++) {{
+            // --- LANDSCAPE GENERATION ---
+            const roadMat = new THREE.MeshPhongMaterial({{color: 0x222222}});
+            for(let i=0; i<150; i++) {{
                 let seg = new THREE.Group();
                 
-                // Grass Landscape (Left & Right)
-                let grass = new THREE.Mesh(new THREE.PlaneGeometry(2000, 100), grassMat);
+                // Grass
+                let grass = new THREE.Mesh(new THREE.PlaneGeometry(3000, 150), new THREE.MeshPhongMaterial({{color: 0x3d7a33}}));
                 grass.rotation.x = -Math.PI/2;
                 seg.add(grass);
 
-                // Central Road
-                let road = new THREE.Mesh(new THREE.PlaneGeometry(160, 100), roadMat);
+                // Road
+                let road = new THREE.Mesh(new THREE.PlaneGeometry(180, 150), roadMat);
                 road.rotation.x = -Math.PI/2;
                 road.position.y = 0.1;
                 seg.add(road);
 
-                // Road Markings (Yellow Centers)
-                if(i % 2 == 0) {{
-                    let line = new THREE.Mesh(new THREE.PlaneGeometry(4, 40), new THREE.MeshBasicMaterial({{color: 0xFFD700}}));
-                    line.rotation.x = -Math.PI/2;
-                    line.position.set(0, 0.2, 0);
-                    seg.add(line);
+                // Yellow Center Line
+                let line = new THREE.Mesh(new THREE.PlaneGeometry(5, 60), new THREE.MeshBasicMaterial({{color: 0xFFD700}}));
+                line.rotation.x = -Math.PI/2;
+                line.position.set(0, 0.2, 0);
+                seg.add(line);
+
+                // Buildings & Palms (The Landscape)
+                if(i % 10 == 0) {{
+                    let house = new THREE.Mesh(new THREE.BoxGeometry(30, 20, 30), new THREE.MeshPhongMaterial({{color: i%20==0?0xD21034:0x00209F}}));
+                    house.position.set(i%20==0?200:-200, 10, 0);
+                    seg.add(house);
+                    
+                    let palm = new THREE.Mesh(new THREE.CylinderGeometry(1, 2, 40), new THREE.MeshPhongMaterial({{color: 0x4d3319}}));
+                    palm.position.set(i%20==0?150:-150, 20, 40);
+                    seg.add(palm);
                 }}
 
-                // Street Lights for turns
-                let pole = new THREE.Group();
-                let pMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 50), new THREE.MeshPhongMaterial({{color: 0x222222}}));
-                let bulb = new THREE.Mesh(new THREE.SphereGeometry(3), new THREE.MeshBasicMaterial({{color: 0xffffaa}}));
-                bulb.position.set(-15, 25, 0);
-                pole.add(pMesh); pole.add(bulb);
-                pole.position.set(130, 25, 0);
-                pole.visible = false;
-                seg.add(pole);
-                seg.light = pole;
-
-                seg.position.z = -i * 100;
+                seg.position.z = -i * 150;
                 scene.add(seg);
                 roadSegments.push(seg);
             }}
 
-            window.addEventListener('keydown', e => {{ 
-                keys[e.code] = true; 
-                if(e.code === 'KeyV') toggleView();
-                if(e.code === 'KeyN') toggleTime();
-            }});
+            window.addEventListener('keydown', e => keys[e.code] = true);
             window.addEventListener('keyup', e => keys[e.code] = false);
-
             animate();
         }}
 
         function toggleView() {{
             isCabin = !isCabin;
-            document.getElementById('mode-txt').innerText = isCabin ? "CABIN MODE" : "FOLLOW MODE";
+            document.getElementById('mode-txt').innerText = isCabin ? "CABIN MODE" : "TRUCK MODE";
         }}
 
         function toggleTime() {{
             isNight = !isNight;
-            let skyColor = isNight ? 0x000814 : 0x87CEEB;
-            scene.background = new THREE.Color(skyColor);
-            scene.fog.color = new THREE.Color(skyColor);
-            scene.sun.intensity = isNight ? 0.1 : 1.2;
+            scene.background = new THREE.Color(isNight ? 0x000814 : 0x87CEEB);
+            scene.fog.color = new THREE.Color(isNight ? 0x000814 : 0x87CEEB);
         }}
 
         function animate() {{
             requestAnimationFrame(animate);
             
-            if (keys['ArrowUp']) speed += 0.0005;
-            else speed *= 0.994;
+            if (keys['ArrowUp']) speed += 0.0006;
+            else speed *= 0.993; // Release to slow down naturally
             if (speed < 0) speed = 0;
 
-            if (keys['ArrowLeft']) targetX -= 2.0;
-            if (keys['ArrowRight']) targetX += 2.0;
-            truckX += (targetX - truckX) * 0.07;
+            if (keys['ArrowLeft']) targetX -= 2.5;
+            if (keys['ArrowRight']) targetX += 2.5;
+            truckX += (targetX - truckX) * 0.08;
             
-            steeringWheel.rotation.z = (targetX - truckX) * -0.4;
-            time += speed * 8;
+            // Hands move with wheel
+            steeringWheel.rotation.z = (targetX - truckX) * -0.5;
+            time += speed * 10;
 
+            // Camera Lockdown (No swinging)
             if(isCabin) {{
-                camera.position.set(truckX, 13, 0);
-                camera.lookAt(truckX, 11, -200);
+                camera.position.set(truckX, 15, -2);
+                camera.lookAt(truckX, 12, -200);
                 steeringWheel.position.x = truckX;
                 steeringWheel.visible = true;
                 truck.visible = false;
             }} else {{
-                camera.position.set(truckX, 60, 250);
+                camera.position.set(truckX, 70, 300);
                 camera.lookAt(truckX, 20, -100);
                 steeringWheel.visible = false;
                 truck.visible = true;
@@ -207,23 +205,26 @@ sim_html = f"""
             }}
 
             roadSegments.forEach((seg, index) => {{
-                seg.position.z += speed * 1200; 
-                if(seg.position.z > 1000) seg.position.z -= 200 * 100;
+                seg.position.z += speed * 1500; 
+                if(seg.position.z > 1000) seg.position.z -= 150 * 150;
                 
-                let zPos = seg.position.z - (time * 60);
+                let zPos = seg.position.z - (time * 80);
                 let curveX = 0;
-                let isCurve = false;
-
-                // REALISTIC LIMITS: Turn after long straight
-                if (zPos < -15000 && zPos > -25000) {{
-                    curveX = Math.sin((zPos + 15000) * 0.0003) * 800;
-                    isCurve = true;
+                if (zPos < -20000 && zPos > -35000) {{
+                    curveX = Math.sin((zPos + 20000) * 0.0002) * 1000;
                 }}
                 seg.position.x = curveX;
-                seg.light.visible = isCurve && isNight;
             }});
 
-            document.getElementById('speed-val').innerText = Math.round(speed * 10000);
+            // RPM / Sound Update
+            if(osc) {{
+                let enginePitch = 20 + (speed * 6000);
+                osc.frequency.setTargetAtTime(enginePitch, audioCtx.currentTime, 0.1);
+                gainNode.gain.setTargetAtTime(speed > 0 ? 0.08 : 0.02, audioCtx.currentTime, 0.1);
+            }}
+
+            document.getElementById('speed-val').innerText = Math.round(speed * 12000);
+            document.getElementById('gear-val').innerText = speed > 0.008 ? "D" : (speed > 0 ? "1" : "N");
             renderer.render(scene, camera);
         }}
     </script>
