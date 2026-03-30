@@ -7,21 +7,21 @@ COMPANY = "EduHumanity"
 
 st.set_page_config(page_title="Haiti Truck - Iron Cabin", layout="wide")
 
-sim_html = f"""
+sim_html = """
 <!DOCTYPE html>
 <html>
 <head>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
-        body {{ margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }}
-        #hud {{ position: absolute; bottom: 0; width: 100%; height: 100px; background: #080808; color: #00FF41; display: flex; justify-content: space-around; align-items: center; border-top: 4px solid #D21034; z-index: 50; }}
-        #start {{ position: absolute; width: 100%; height: 100%; background: #000; color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 200; cursor: pointer; }}
-        #crash {{ position: absolute; width: 100%; height: 100%; background: rgba(210, 16, 52, 0.9); color: white; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 300; }}
+        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
+        #hud { position: absolute; bottom: 0; width: 100%; height: 100px; background: #080808; color: #00FF41; display: flex; justify-content: space-around; align-items: center; border-top: 4px solid #D21034; z-index: 50; }
+        #start { position: absolute; width: 100%; height: 100%; background: #000; color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 200; cursor: pointer; }
+        #crash { position: absolute; width: 100%; height: 100%; background: rgba(210, 16, 52, 0.9); color: white; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 300; }
     </style>
 </head>
 <body>
     <div id="start" onclick="this.style.display='none'; init();">
-        <h1 style="color:#D21034;">🇭🇹 {COMPANY}</h1>
+        <h1 style="color:#D21034;">🇭🇹 EduHumanity</h1>
         <p>IRON-CLAD CABIN LOCK | EXPRESSIVE SIGNS</p>
         <h2 style="background:#00209F; padding:10px 40px; border-radius:5px;">START ENGINE</h2>
     </div>
@@ -32,7 +32,7 @@ sim_html = f"""
     </div>
 
     <div id="hud">
-        <div>DRIVER: <b>{OWNER}</b></div>
+        <div>DRIVER: <b>Gesner Deslandes</b></div>
         <div style="font-size:24px;">SPEED: <span id="sp">0</span> MPH</div>
         <div style="font-size:24px;">GEAR: <span style="color:#fff;">[D]</span></div>
     </div>
@@ -42,7 +42,7 @@ sim_html = f"""
         let speed = 0, roadX = 0, targetRoadX = 0;
         let isCrashed = false, audioCtx, engineOsc, engineGain;
 
-        function init() {{
+        function init() {
             // --- DIESEL AUDIO ---
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             engineOsc = audioCtx.createOscillator();
@@ -59,7 +59,7 @@ sim_html = f"""
             scene.fog = new THREE.Fog(0x87CEEB, 1, 20000);
             
             camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 60000);
-            renderer = new THREE.WebGLRenderer({{antialias: true}});
+            renderer = new THREE.WebGLRenderer({antialias: true});
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
             
@@ -68,22 +68,22 @@ sim_html = f"""
 
             // --- THE IRON CABIN (STAYS STILL) ---
             cabin = new THREE.Group();
-            let cMat = new THREE.MeshPhongMaterial({{color: 0x111111}});
+            let cMat = new THREE.MeshPhongMaterial({color: 0x111111});
             
-            // Dashboard (Centered)
+            // Dashboard
             let dash = new THREE.Mesh(new THREE.BoxGeometry(400, 50, 100), cMat);
             dash.position.set(0, -35, -80);
             cabin.add(dash);
 
-            // Big Circular Steering Wheel (Centered with driver seat at -60)
+            // Steering wheel
             wheel = new THREE.Group();
-            let wRing = new THREE.Mesh(new THREE.TorusGeometry(18, 3.5, 32, 128), new THREE.MeshPhongMaterial({{color: 0x000}}));
+            let wRing = new THREE.Mesh(new THREE.TorusGeometry(18, 3.5, 32, 128), new THREE.MeshPhongMaterial({color: 0x000}));
             wheel.add(wRing);
             wheel.position.set(-60, 20, -100);
             wheel.rotation.x = 1.55; 
             cabin.add(wheel);
 
-            // Symmetrical Pillars
+            // Pillars
             let pL = new THREE.Mesh(new THREE.BoxGeometry(10, 250, 10), cMat);
             pL.position.set(-180, 80, -60);
             pL.rotation.z = 0.04;
@@ -101,47 +101,47 @@ sim_html = f"""
 
             const numSegments = 100;
             const segmentLength = 1200;
-            for(let i = 0; i < numSegments; i++) {{
+            for(let i = 0; i < numSegments; i++) {
                 let s = new THREE.Group();
-                let gr = new THREE.Mesh(new THREE.PlaneGeometry(25000, segmentLength), new THREE.MeshPhongMaterial({{color: 0x228B22}}));
-                let rd = new THREE.Mesh(new THREE.PlaneGeometry(800, segmentLength), new THREE.MeshPhongMaterial({{color: 0x1a1a1a}}));
+                let gr = new THREE.Mesh(new THREE.PlaneGeometry(25000, segmentLength), new THREE.MeshPhongMaterial({color: 0x228B22}));
+                let rd = new THREE.Mesh(new THREE.PlaneGeometry(800, segmentLength), new THREE.MeshPhongMaterial({color: 0x1a1a1a}));
                 gr.rotation.x = rd.rotation.x = -Math.PI/2;
                 s.add(gr); s.add(rd);
 
-                // Add Objects on Grass
-                if(i % 7 == 0) {{
+                // Add objects
+                if(i % 7 == 0) {
                     let side = (i % 14 == 0) ? 900 : -900;
-                    if(i % 21 == 0) {{ // Restaurant
-                        let res = new THREE.Mesh(new THREE.BoxGeometry(350, 180, 300), new THREE.MeshPhongMaterial({{color: 0xD21034}}));
+                    if(i % 21 == 0) { // Restaurant
+                        let res = new THREE.Mesh(new THREE.BoxGeometry(350, 180, 300), new THREE.MeshPhongMaterial({color: 0xD21034}));
                         res.position.set(side * 1.6, 90, 0);
                         s.add(res);
-                    }} else {{ // Signs
-                        let sign = new THREE.Mesh(new THREE.CylinderGeometry(35, 35, 5, 8), new THREE.MeshPhongMaterial({{color: (i%2==0)? 0xFF0000 : 0xFFFFFF}}));
+                    } else { // Signs
+                        let sign = new THREE.Mesh(new THREE.CylinderGeometry(35, 35, 5, 8), new THREE.MeshPhongMaterial({color: (i%2==0)? 0xFF0000 : 0xFFFFFF}));
                         sign.position.set(side, 120, 0);
                         sign.rotation.x = Math.PI/2;
                         s.add(sign);
-                    }}
-                }}
+                    }
+                }
 
                 s.position.z = -i * segmentLength;
                 roadGroup.add(s);
                 roadSegments.push(s);
-            }}
+            }
 
             // Controls
-            window.addEventListener('keydown', e => {{ 
+            window.addEventListener('keydown', e => { 
                 if(isCrashed) return;
                 if(e.key === 'ArrowUp') speed = Math.min(speed + 0.015, 0.4);
                 if(e.key === 'ArrowLeft') targetRoadX = Math.min(targetRoadX + 45, 400);
                 if(e.key === 'ArrowRight') targetRoadX = Math.max(targetRoadX - 45, -400);
-            }});
-            window.addEventListener('keyup', e => {{
+            });
+            window.addEventListener('keyup', e => {
                 if(e.key === 'ArrowUp') speed = Math.max(speed - 0.01, 0);
-            }});
+            });
             animate();
-        }}
+        }
 
-        function animate() {{
+        function animate() {
             if(isCrashed) return;
             requestAnimationFrame(animate);
             
@@ -151,10 +151,10 @@ sim_html = f"""
             
             // Move road segments
             const moveAmount = speed * 25000;
-            for(let seg of roadSegments) {{
+            for(let seg of roadSegments) {
                 seg.position.z += moveAmount;
                 if(seg.position.z > 5000) seg.position.z -= 100 * 1200;
-            }}
+            }
             
             // Steering
             roadGroup.position.x = roadX;
@@ -174,11 +174,11 @@ sim_html = f"""
             let mph = Math.floor(speed * 1500);
             document.getElementById('sp').innerText = mph;
             
-            // Engine sound pitch (20 Hz to 120 Hz based on speed)
+            // Engine sound
             if(engineOsc) engineOsc.frequency.setTargetAtTime(20 + speed * 100, audioCtx.currentTime, 0.1);
             
             renderer.render(scene, camera);
-        }}
+        }
     </script>
 </body>
 </html>
