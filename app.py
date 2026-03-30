@@ -9,14 +9,14 @@ sim_html = """
 <head>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; font-family: sans-serif; }
+        body { margin: 0; overflow: hidden; font-family: monospace; }
         #info {
             position: absolute;
             top: 20px;
             left: 20px;
             color: white;
-            background: rgba(0,0,0,0.6);
-            padding: 10px;
+            background: rgba(0,0,0,0.7);
+            padding: 12px;
             border-radius: 8px;
             z-index: 100;
             pointer-events: none;
@@ -26,8 +26,8 @@ sim_html = """
             bottom: 20px;
             left: 20px;
             color: white;
-            background: rgba(0,0,0,0.6);
-            padding: 10px;
+            background: rgba(0,0,0,0.7);
+            padding: 12px;
             border-radius: 8px;
             z-index: 100;
             font-family: monospace;
@@ -44,6 +44,7 @@ sim_html = """
             align-items: center;
             z-index: 200;
             cursor: pointer;
+            font-family: sans-serif;
         }
     </style>
 </head>
@@ -68,7 +69,7 @@ sim_html = """
         let animId = null;
 
         function startGame() {
-            // --- 3D SETUP ---
+            // --- 3D Setup ---
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x87CEEB);
             scene.fog = new THREE.Fog(0x87CEEB, 500, 15000);
@@ -98,7 +99,7 @@ sim_html = """
             wheel = new THREE.Group();
             const wheelRing = new THREE.Mesh(new THREE.TorusGeometry(18, 3.5, 32, 64), new THREE.MeshPhongMaterial({ color: 0x111111 }));
             wheel.add(wheelRing);
-            // Add spokes
+            // Spokes
             for (let i = 0; i < 3; i++) {
                 const spoke = new THREE.Mesh(new THREE.BoxGeometry(25, 3, 3), new THREE.MeshPhongMaterial({ color: 0x888888 }));
                 spoke.rotation.z = (i * Math.PI * 2 / 3);
@@ -120,7 +121,7 @@ sim_html = """
 
             scene.add(cabin);
 
-            // --- ROAD (moving world) ---
+            // --- MOVING WORLD ---
             roadGroup = new THREE.Group();
             scene.add(roadGroup);
 
@@ -142,15 +143,15 @@ sim_html = """
                 road.rotation.x = -Math.PI / 2;
                 segment.add(road);
 
-                // Add simple trees or signs
+                // Trees
                 if (i % 8 === 0) {
                     const side = (i % 16 === 0) ? 900 : -900;
-                    const treeTrunk = new THREE.Mesh(new THREE.CylinderGeometry(20, 25, 60, 6), new THREE.MeshPhongMaterial({ color: 0x8B5A2B }));
-                    treeTrunk.position.set(side, 30, 0);
-                    segment.add(treeTrunk);
-                    const treeTop = new THREE.Mesh(new THREE.ConeGeometry(35, 80, 8), new THREE.MeshPhongMaterial({ color: 0x2c8c2c }));
-                    treeTop.position.set(side, 80, 0);
-                    segment.add(treeTop);
+                    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(20, 25, 60, 6), new THREE.MeshPhongMaterial({ color: 0x8B5A2B }));
+                    trunk.position.set(side, 30, 0);
+                    segment.add(trunk);
+                    const top = new THREE.Mesh(new THREE.ConeGeometry(35, 80, 8), new THREE.MeshPhongMaterial({ color: 0x2c8c2c }));
+                    top.position.set(side, 80, 0);
+                    segment.add(top);
                 }
 
                 segment.position.z = -i * segmentLength;
@@ -168,7 +169,7 @@ sim_html = """
                 if (e.key === 'ArrowUp') speed = Math.max(speed - 0.015, 0);
             });
 
-            // Start animation loop
+            // Start animation
             animate();
         }
 
@@ -193,17 +194,17 @@ sim_html = """
             // Steering wheel visual
             if (wheel) wheel.rotation.z = -roadX * 0.006;
 
-            // Camera position (driver's view)
+            // Camera (driver's view)
             camera.position.set(-60, 70, 150);
             camera.lookAt(-60, 50, -1000);
 
-            // Cabin must follow camera (so it stays in view)
+            // Cabin follows camera
             cabin.position.copy(camera.position);
             cabin.rotation.copy(camera.rotation);
             cabin.translateZ(-180);
             cabin.translateY(-60);
 
-            // Update speed display
+            // Update HUD
             const mph = Math.floor(speed * 1600);
             document.getElementById('speed').innerText = mph;
 
