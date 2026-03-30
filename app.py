@@ -1,10 +1,6 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-# --- PROJECT DATA ---
-OWNER = "Gesner Deslandes"
-COMPANY = "EduHumanity"
-
 st.set_page_config(page_title="Haiti Truck - Iron Cabin", layout="wide")
 
 sim_html = """
@@ -13,170 +9,204 @@ sim_html = """
 <head>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
-        #hud { position: absolute; bottom: 0; width: 100%; height: 100px; background: #080808; color: #00FF41; display: flex; justify-content: space-around; align-items: center; border-top: 4px solid #D21034; z-index: 50; }
-        #start { position: absolute; width: 100%; height: 100%; background: #000; color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 200; cursor: pointer; }
-        #crash { position: absolute; width: 100%; height: 100%; background: rgba(210, 16, 52, 0.9); color: white; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 300; }
+        body { margin: 0; overflow: hidden; font-family: sans-serif; }
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0,0,0,0.6);
+            padding: 10px;
+            border-radius: 8px;
+            z-index: 100;
+            pointer-events: none;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0,0,0,0.6);
+            padding: 10px;
+            border-radius: 8px;
+            z-index: 100;
+            font-family: monospace;
+        }
+        #start {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
-    <div id="start" onclick="this.style.display='none'; init();">
+    <div id="start" onclick="this.style.display='none'; startGame();">
         <h1 style="color:#D21034;">🇭🇹 EduHumanity</h1>
         <p>IRON-CLAD CABIN LOCK | EXPRESSIVE SIGNS</p>
         <h2 style="background:#00209F; padding:10px 40px; border-radius:5px;">START ENGINE</h2>
     </div>
-
-    <div id="crash">
-        <h1>💥 CABIN INTACT - WORLD RESET</h1>
-        <button style="padding:15px; cursor:pointer;" onclick="location.reload()">RESTART</button>
+    <div id="info">
+        <b>DRIVER: Gesner Deslandes</b><br>
+        Speed: <span id="speed">0</span> mph
     </div>
-
-    <div id="hud">
-        <div>DRIVER: <b>Gesner Deslandes</b></div>
-        <div style="font-size:24px;">SPEED: <span id="sp">0</span> MPH</div>
-        <div style="font-size:24px;">GEAR: <span style="color:#fff;">[D]</span></div>
+    <div id="controls">
+        ↑ Accelerate<br>
+        ← → Steer
     </div>
 
     <script>
         let scene, camera, renderer, cabin, wheel, roadGroup, roadSegments = [];
         let speed = 0, roadX = 0, targetRoadX = 0;
-        let isCrashed = false, audioCtx, engineOsc, engineGain;
+        let animId = null;
 
-        function init() {
-            // --- DIESEL AUDIO ---
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            engineOsc = audioCtx.createOscillator();
-            engineGain = audioCtx.createGain();
-            engineOsc.type = 'triangle';
-            engineGain.gain.value = 0.12;
-            engineOsc.connect(engineGain);
-            engineGain.connect(audioCtx.destination);
-            engineOsc.start();
-
+        function startGame() {
             // --- 3D SETUP ---
-            scene = new THREE.Scene(); 
+            scene = new THREE.Scene();
             scene.background = new THREE.Color(0x87CEEB);
-            scene.fog = new THREE.Fog(0x87CEEB, 1, 20000);
-            
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 60000);
-            renderer = new THREE.WebGLRenderer({antialias: true});
+            scene.fog = new THREE.Fog(0x87CEEB, 500, 15000);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 20000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
-            
-            let amb = new THREE.AmbientLight(0xffffff, 1.6);
-            scene.add(amb);
 
-            // --- THE IRON CABIN (STAYS STILL) ---
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+            scene.add(ambientLight);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+            dirLight.position.set(100, 200, 100);
+            scene.add(dirLight);
+
+            // --- CABIN (driver's view) ---
             cabin = new THREE.Group();
-            let cMat = new THREE.MeshPhongMaterial({color: 0x111111});
-            
+            const darkMat = new THREE.MeshPhongMaterial({ color: 0x222222 });
+
             // Dashboard
-            let dash = new THREE.Mesh(new THREE.BoxGeometry(400, 50, 100), cMat);
+            const dash = new THREE.Mesh(new THREE.BoxGeometry(400, 50, 100), darkMat);
             dash.position.set(0, -35, -80);
             cabin.add(dash);
 
             // Steering wheel
             wheel = new THREE.Group();
-            let wRing = new THREE.Mesh(new THREE.TorusGeometry(18, 3.5, 32, 128), new THREE.MeshPhongMaterial({color: 0x000}));
-            wheel.add(wRing);
+            const wheelRing = new THREE.Mesh(new THREE.TorusGeometry(18, 3.5, 32, 64), new THREE.MeshPhongMaterial({ color: 0x111111 }));
+            wheel.add(wheelRing);
+            // Add spokes
+            for (let i = 0; i < 3; i++) {
+                const spoke = new THREE.Mesh(new THREE.BoxGeometry(25, 3, 3), new THREE.MeshPhongMaterial({ color: 0x888888 }));
+                spoke.rotation.z = (i * Math.PI * 2 / 3);
+                wheel.add(spoke);
+            }
             wheel.position.set(-60, 20, -100);
-            wheel.rotation.x = 1.55; 
+            wheel.rotation.x = 1.55;
             cabin.add(wheel);
 
             // Pillars
-            let pL = new THREE.Mesh(new THREE.BoxGeometry(10, 250, 10), cMat);
-            pL.position.set(-180, 80, -60);
-            pL.rotation.z = 0.04;
-            cabin.add(pL);
-            let pR = pL.clone();
-            pR.position.x = 180;
-            pR.rotation.z = -0.04;
-            cabin.add(pR);
+            const leftPillar = new THREE.Mesh(new THREE.BoxGeometry(10, 250, 10), darkMat);
+            leftPillar.position.set(-180, 80, -60);
+            leftPillar.rotation.z = 0.04;
+            cabin.add(leftPillar);
+            const rightPillar = leftPillar.clone();
+            rightPillar.position.x = 180;
+            rightPillar.rotation.z = -0.04;
+            cabin.add(rightPillar);
 
             scene.add(cabin);
 
-            // --- THE MOVING WORLD ---
+            // --- ROAD (moving world) ---
             roadGroup = new THREE.Group();
             scene.add(roadGroup);
 
-            const numSegments = 100;
             const segmentLength = 1200;
-            for(let i = 0; i < numSegments; i++) {
-                let s = new THREE.Group();
-                let gr = new THREE.Mesh(new THREE.PlaneGeometry(25000, segmentLength), new THREE.MeshPhongMaterial({color: 0x228B22}));
-                let rd = new THREE.Mesh(new THREE.PlaneGeometry(800, segmentLength), new THREE.MeshPhongMaterial({color: 0x1a1a1a}));
-                gr.rotation.x = rd.rotation.x = -Math.PI/2;
-                s.add(gr); s.add(rd);
+            const numSegments = 100;
+            const roadWidth = 800;
+            const grassWidth = 25000;
 
-                // Add objects
-                if(i % 7 == 0) {
-                    let side = (i % 14 == 0) ? 900 : -900;
-                    if(i % 21 == 0) { // Restaurant
-                        let res = new THREE.Mesh(new THREE.BoxGeometry(350, 180, 300), new THREE.MeshPhongMaterial({color: 0xD21034}));
-                        res.position.set(side * 1.6, 90, 0);
-                        s.add(res);
-                    } else { // Signs
-                        let sign = new THREE.Mesh(new THREE.CylinderGeometry(35, 35, 5, 8), new THREE.MeshPhongMaterial({color: (i%2==0)? 0xFF0000 : 0xFFFFFF}));
-                        sign.position.set(side, 120, 0);
-                        sign.rotation.x = Math.PI/2;
-                        s.add(sign);
-                    }
+            for (let i = 0; i < numSegments; i++) {
+                const segment = new THREE.Group();
+
+                // Grass
+                const grass = new THREE.Mesh(new THREE.PlaneGeometry(grassWidth, segmentLength), new THREE.MeshPhongMaterial({ color: 0x3c9e3c }));
+                grass.rotation.x = -Math.PI / 2;
+                segment.add(grass);
+
+                // Road
+                const road = new THREE.Mesh(new THREE.PlaneGeometry(roadWidth, segmentLength), new THREE.MeshPhongMaterial({ color: 0x2c2c2c }));
+                road.rotation.x = -Math.PI / 2;
+                segment.add(road);
+
+                // Add simple trees or signs
+                if (i % 8 === 0) {
+                    const side = (i % 16 === 0) ? 900 : -900;
+                    const treeTrunk = new THREE.Mesh(new THREE.CylinderGeometry(20, 25, 60, 6), new THREE.MeshPhongMaterial({ color: 0x8B5A2B }));
+                    treeTrunk.position.set(side, 30, 0);
+                    segment.add(treeTrunk);
+                    const treeTop = new THREE.Mesh(new THREE.ConeGeometry(35, 80, 8), new THREE.MeshPhongMaterial({ color: 0x2c8c2c }));
+                    treeTop.position.set(side, 80, 0);
+                    segment.add(treeTop);
                 }
 
-                s.position.z = -i * segmentLength;
-                roadGroup.add(s);
-                roadSegments.push(s);
+                segment.position.z = -i * segmentLength;
+                roadGroup.add(segment);
+                roadSegments.push(segment);
             }
 
-            // Controls
-            window.addEventListener('keydown', e => { 
-                if(isCrashed) return;
-                if(e.key === 'ArrowUp') speed = Math.min(speed + 0.015, 0.4);
-                if(e.key === 'ArrowLeft') targetRoadX = Math.min(targetRoadX + 45, 400);
-                if(e.key === 'ArrowRight') targetRoadX = Math.max(targetRoadX - 45, -400);
+            // --- Controls ---
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowUp') speed = Math.min(speed + 0.02, 0.45);
+                if (e.key === 'ArrowLeft') targetRoadX = Math.min(targetRoadX + 35, 350);
+                if (e.key === 'ArrowRight') targetRoadX = Math.max(targetRoadX - 35, -350);
             });
-            window.addEventListener('keyup', e => {
-                if(e.key === 'ArrowUp') speed = Math.max(speed - 0.01, 0);
+            window.addEventListener('keyup', (e) => {
+                if (e.key === 'ArrowUp') speed = Math.max(speed - 0.015, 0);
             });
+
+            // Start animation loop
             animate();
         }
 
         function animate() {
-            if(isCrashed) return;
+            if (!scene) return;
             requestAnimationFrame(animate);
-            
+
             // Physics
-            speed *= 0.998;
-            roadX += (targetRoadX - roadX) * 0.08;
-            
+            speed *= 0.995;
+            roadX += (targetRoadX - roadX) * 0.12;
+
             // Move road segments
-            const moveAmount = speed * 25000;
-            for(let seg of roadSegments) {
-                seg.position.z += moveAmount;
-                if(seg.position.z > 5000) seg.position.z -= 100 * 1200;
+            const move = speed * 25000;
+            for (let seg of roadSegments) {
+                seg.position.z += move;
+                if (seg.position.z > 5000) seg.position.z -= roadSegments.length * 1200;
             }
-            
-            // Steering
+
+            // Steer the world
             roadGroup.position.x = roadX;
-            wheel.rotation.z = -roadX * 0.005;
-            
-            // Camera fixed at driver's perspective
-            camera.position.set(-60, 80, 150);
-            camera.lookAt(-60, 50, -1200);
-            
-            // Cabin always attached to camera
+
+            // Steering wheel visual
+            if (wheel) wheel.rotation.z = -roadX * 0.006;
+
+            // Camera position (driver's view)
+            camera.position.set(-60, 70, 150);
+            camera.lookAt(-60, 50, -1000);
+
+            // Cabin must follow camera (so it stays in view)
             cabin.position.copy(camera.position);
             cabin.rotation.copy(camera.rotation);
             cabin.translateZ(-180);
             cabin.translateY(-60);
-            
-            // Update HUD
-            let mph = Math.floor(speed * 1500);
-            document.getElementById('sp').innerText = mph;
-            
-            // Engine sound
-            if(engineOsc) engineOsc.frequency.setTargetAtTime(20 + speed * 100, audioCtx.currentTime, 0.1);
-            
+
+            // Update speed display
+            const mph = Math.floor(speed * 1600);
+            document.getElementById('speed').innerText = mph;
+
             renderer.render(scene, camera);
         }
     </script>
