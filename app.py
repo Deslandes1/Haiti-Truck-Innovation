@@ -1,12 +1,13 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-# --- OWNER DATA ---
+# --- CREDENTIALS ---
 OWNER = "Gesner Deslandes"
 COMPANY = "EduHumanity"
 
-st.set_page_config(page_title="Haiti Truck Innovation - Recovery", layout="wide")
+st.set_page_config(page_title="Haiti Truck Pro", layout="wide")
 
+# Optimized lightweight engine to prevent Syntax Errors
 sim_html = f"""
 <!DOCTYPE html>
 <html>
@@ -14,141 +15,71 @@ sim_html = f"""
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         body {{ margin: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; }}
-        #ui-layer {{
-            position: absolute; top: 0; width: 100%; height: 100%;
-            pointer-events: none; z-index: 10;
-        }}
-        .hud-box {{
-            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            background: rgba(0,0,0,0.8); color: #00FF41; padding: 15px 40px;
-            border-radius: 50px; border: 2px solid #D21034; pointer-events: auto;
-            text-align: center;
-        }}
-        #start-gate {{
-            position: absolute; width: 100%; height: 100%; background: #000;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-            color: white; z-index: 100; cursor: pointer;
-        }}
+        #dash {{ position: absolute; bottom: 0; width: 100%; height: 120px; background: #111; color: #00FF41; display: flex; justify-content: center; align-items: center; gap: 40px; border-top: 4px solid #D21034; z-index: 100; }}
+        #start {{ position: absolute; width: 100%; height: 100%; background: #000; color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 200; cursor: pointer; }}
     </style>
 </head>
 <body>
-
-    <div id="start-gate" onclick="this.style.display='none'; init();">
+    <div id="start" onclick="this.style.display='none'; init();">
         <h1 style="color:#D21034;">🇭🇹 {COMPANY}</h1>
-        <p>SCREEN RECOVERY MODE: ACTIVE</p>
-        <h2 style="background:#D21034; padding:10px 20px; border-radius:5px;">CLICK TO START ENGINE</h2>
+        <p>CLICK TO START ENGINE & ENABLE SOUND</p>
     </div>
-
-    <div id="ui-layer">
-        <div class="hud-box">
-            <small>{OWNER} | {COMPANY}</small><br>
-            SPEED: <span id="speedo" style="font-size:30px; font-weight:bold;">0</span> MPH
-        </div>
+    <div id="dash">
+        <div>{OWNER}</div>
+        <div style="font-size:24px;">SPEED: <span id="sp">0</span> MPH</div>
     </div>
-
     <script>
-        let scene, camera, renderer, wheel, truck, roadSegments = [];
-        let speed = 0, truckX = 0, targetX = 0, time = 0, keys = {{}};
-        let audioCtx, osc;
-
+        let scene, camera, renderer, wheel, hands, road = [], speed = 0, tx = 0, targetX = 0, osc;
         function init() {{
-            // Audio setup
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            osc = audioCtx.createOscillator();
-            let g = audioCtx.createGain();
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(20, audioCtx.currentTime);
-            g.gain.setValueAtTime(0.04, audioCtx.currentTime);
-            osc.connect(g); g.connect(audioCtx.destination);
-            osc.start();
+            let ctx = new (window.AudioContext || window.webkitAudioContext)();
+            osc = ctx.createOscillator(); let g = ctx.createGain();
+            osc.type = 'sawtooth'; g.gain.value = 0.03; osc.connect(g); g.connect(ctx.destination); osc.start();
 
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x87CEEB);
-
-            camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 10000);
-            
-            renderer = new THREE.WebGLRenderer({{ antialias: false }}); // Disabled antialias for speed
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            document.body.appendChild(renderer.domElement);
-
+            scene = new THREE.Scene(); scene.background = new THREE.Color(0x87CEEB);
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 1, 10000);
+            renderer = new THREE.WebGLRenderer({{antialias: true}});
+            renderer.setSize(window.innerWidth, window.innerHeight); document.body.appendChild(renderer.domElement);
             scene.add(new THREE.AmbientLight(0xffffff, 1));
 
-            // --- THE TRUCK (Simplified to prevent lag) ---
-            truck = new THREE.Group();
-            let cab = new THREE.Mesh(new THREE.BoxGeometry(10, 10, 10), new THREE.MeshBasicMaterial({{color: 0x00209F}}));
-            truck.add(cab);
-            scene.add(truck);
-
-            // --- THE WHEEL & HANDS ---
+            // Steering Wheel & Hands
             wheel = new THREE.Group();
-            let wMesh = new THREE.Mesh(new THREE.TorusGeometry(3, 0.4, 8, 24), new THREE.MeshBasicMaterial({{color: 0x111111}}));
-            wheel.add(wMesh);
-            
-            // Two Hands
-            let handMat = new THREE.MeshBasicMaterial({{color: 0x5c4033}});
-            let LHand = new THREE.Mesh(new THREE.BoxGeometry(1.5, 3, 1), handMat);
-            LHand.position.set(-3, 0, 0.5);
-            let RHand = LHand.clone(); RHand.position.set(3, 0, 0.5);
-            wheel.add(LHand); wheel.add(RHand);
-            
-            wheel.position.set(0, 7, -5);
-            wheel.rotation.x = Math.PI/3;
-            scene.add(wheel);
+            let wM = new THREE.Mesh(new THREE.TorusGeometry(3.5, 0.5, 10, 40), new THREE.MeshBasicMaterial({{color: 0x222222}}));
+            wheel.add(wM);
+            let hM = new THREE.MeshBasicMaterial({{color: 0x5c4033}});
+            let L = new THREE.Mesh(new THREE.BoxGeometry(1.5, 3, 1), hM); L.position.set(-3.5, -0.5, 1);
+            let R = L.clone(); R.position.set(3.5, -0.5, 1);
+            wheel.add(L); wheel.add(R);
+            wheel.position.set(0, 7, -6); wheel.rotation.x = 1.1; scene.add(wheel);
 
-            // --- THE ROAD & LANDSCAPE ---
+            // Road Segments
             for(let i=0; i<100; i++) {{
-                let seg = new THREE.Group();
-                // Grass
-                let grass = new THREE.Mesh(new THREE.PlaneGeometry(1000, 200), new THREE.MeshBasicMaterial({{color: 0x3d7a33}}));
-                grass.rotation.x = -Math.PI/2;
-                seg.add(grass);
-                // Road
-                let road = new THREE.Mesh(new THREE.PlaneGeometry(120, 200), new THREE.MeshBasicMaterial({{color: 0x222222}}));
-                road.rotation.x = -Math.PI/2;
-                road.position.y = 0.05;
-                seg.add(road);
-                // Line
-                let line = new THREE.Mesh(new THREE.PlaneGeometry(4, 50), new THREE.MeshBasicMaterial({{color: 0xFFD700}}));
-                line.rotation.x = -Math.PI/2;
-                line.position.set(0, 0.1, 0);
-                seg.add(line);
-
-                seg.position.z = -i * 200;
-                scene.add(seg);
-                roadSegments.push(seg);
+                let s = new THREE.Group();
+                let gr = new THREE.Mesh(new THREE.PlaneGeometry(2000, 200), new THREE.MeshBasicMaterial({{color: 0x3d7a33}}));
+                let rd = new THREE.Mesh(new THREE.PlaneGeometry(120, 200), new THREE.MeshBasicMaterial({{color: 0x222222}}));
+                let ln = new THREE.Mesh(new THREE.PlaneGeometry(4, 60), new THREE.MeshBasicMaterial({{color: 0xFFD700}}));
+                gr.rotation.x = rd.rotation.x = ln.rotation.x = -Math.PI/2;
+                rd.position.y = 0.1; ln.position.y = 0.2; s.add(gr); s.add(rd); s.add(ln);
+                
+                // Add simple houses on the landscape
+                if(i%8==0) {{
+                    let h = new THREE.Mesh(new THREE.BoxGeometry(30, 20, 30), new THREE.MeshBasicMaterial({{color: 0xD21034}}));
+                    h.position.set(i%16==0?150:-150, 10, 0); s.add(h);
+                }}
+                s.position.z = -i * 200; scene.add(s); road.push(s);
             }}
 
-            window.addEventListener('keydown', e => keys[e.code] = true);
-            window.addEventListener('keyup', e => keys[e.code] = false);
+            window.addEventListener('keydown', e => {{ if(e.key=='ArrowUp') speed += 0.001; if(e.key=='ArrowLeft') targetX -= 3; if(e.key=='ArrowRight') targetX += 3; }});
             animate();
         }}
 
         function animate() {{
             requestAnimationFrame(animate);
-            
-            if (keys['ArrowUp']) speed += 0.0008;
-            else speed *= 0.992;
-            if (speed < 0) speed = 0;
-
-            if (keys['ArrowLeft']) targetX -= 3;
-            if (keys['ArrowRight']) targetX += 3;
-            truckX += (targetX - truckX) * 0.1;
-
-            wheel.rotation.z = (targetX - truckX) * -0.1;
-            wheel.position.x = truckX;
-            
-            // Fixed Dashboard Camera
-            camera.position.set(truckX, 10, 0);
-            camera.lookAt(truckX, 8, -100);
-
-            roadSegments.forEach(seg => {{
-                seg.position.z += speed * 2000;
-                if(seg.position.z > 400) seg.position.z -= 100 * 200;
-            }});
-
-            document.getElementById('speedo').innerText = Math.round(speed * 15000);
-            if(osc) osc.frequency.setTargetAtTime(20 + (speed * 8000), audioCtx.currentTime, 0.1);
-            
+            speed *= 0.99; tx += (targetX - tx) * 0.1;
+            wheel.position.x = tx; wheel.rotation.z = (targetX - tx) * -0.1;
+            camera.position.set(tx, 12, 0); camera.lookAt(tx, 10, -100);
+            road.forEach(s => {{ s.position.z += speed * 2500; if(s.position.z > 400) s.position.z -= 100 * 200; }});
+            document.getElementById('sp').innerText = Math.round(speed * 20000);
+            if(osc) osc.frequency.value = 20 + (speed * 9000);
             renderer.render(scene, camera);
         }}
     </script>
@@ -156,4 +87,4 @@ sim_html = f"""
 </html>
 """
 
-components.html(sim_html, height=850)
+components.html(sim_html, height=800)
