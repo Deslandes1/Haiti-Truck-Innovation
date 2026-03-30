@@ -1,121 +1,125 @@
 import streamlit as st
-import time
-import pandas as pd
-import numpy as np
+import streamlit.components.v1 as components
 
-# --- 1. SETTINGS & CREDENTIALS ---
-st.set_page_config(page_title="Haiti Truck Innovation", page_icon="🚛", layout="wide")
-
+# --- 1. CREDENTIALS & SYSTEM CONFIG ---
 COMPANY = "GlobalInternet.py"
 OWNER = "Gesner Deslandes"
 CONTACT = "deslandes78@gmail.com | (509)-4738-5663"
 PASSWORD_REQUIRED = "20082010"
 
-# --- 2. SESSION STATE MANAGEMENT ---
-if 'auth' not in st.session_state:
-    st.session_state.auth = False
-if 'attached' not in st.session_state:
-    st.session_state.attached = False
-if 'location' not in st.session_state:
-    st.session_state.location = "Florida"
-if 'fuel' not in st.session_state:
-    st.session_state.fuel = 100
-if 'log' not in st.session_state:
-    st.session_state.log = []
+st.set_page_config(page_title="Haiti Truck Innovation", layout="wide")
 
-# --- 3. LOGIN GATE ---
-if not st.session_state.auth:
-    st.markdown("""
-        <div style='text-align: center;'>
-            <h1 style='color: #00209F;'>🇭🇹 HAITI TRUCK INNOVATION</h1>
-            <h3 style='color: #D21034;'>Training Simulator V1.0</h3>
-        </div>
-    """, unsafe_allow_html=True)
+# --- 2. LOGIN GATE ---
+if 'authenticated' not in st.session_state:
+    st.session_state.authenticated = False
+
+if not st.session_state.authenticated:
+    st.markdown(f"<h1 style='text-align:center; color:#00209F;'>🇭🇹 {COMPANY}</h1>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='text-align:center; color:#D21034;'>Haiti Truck Innovation - Login</h3>", unsafe_allow_html=True)
     
-    pwd = st.text_input("ENTER SYSTEM KEY:", type="password")
-    if st.button("IGNITION"):
+    pwd = st.text_input("Enter Access Code:", type="password")
+    if st.button("START ENGINE"):
         if pwd == PASSWORD_REQUIRED:
-            st.session_state.auth = True
+            st.session_state.authenticated = True
             st.rerun()
         else:
-            st.error("ACCESS DENIED: INCORRECT KEY")
-    
-    st.info(f"Developer: {OWNER} | {COMPANY}")
+            st.error("Invalid Code")
     st.stop()
 
-# --- 4. MAIN SIMULATOR INTERFACE ---
-st.title(f"🚚 {st.session_state.location} Highway Patrol")
-st.sidebar.image("https://flagcdn.com/w320/ht.png", width=150)
-st.sidebar.header("🚛 TRUCK CONTROLS")
-
-# Dashboard Gauges
-col1, col2, col3 = st.columns(3)
-with col1:
-    speed = st.sidebar.slider("ACCELERATOR (Gas)", 0, 85, 0)
-    st.metric("SPEED", f"{speed} MPH")
-with col2:
-    rpm = (speed * 30) + 800 if speed > 0 else 800
-    st.metric("ENGINE RPM", int(rpm))
-with col3:
-    st.metric("FUEL LEVEL", f"{st.session_state.fuel}%")
-
-# Driving Mechanics
-st.sidebar.markdown("---")
-clutch = st.sidebar.checkbox("CLUTCH (Manual Engagement)")
-brake = st.sidebar.button("🛑 AIR BRAKE (STOP)")
-gear = st.sidebar.selectbox("GEARBOX", ["Reverse", "Neutral", "1st Low", "2nd", "3rd", "4th High"])
-
-# Action: Attach Load
-if not st.session_state.attached:
-    st.warning("⚠️ STATUS: Trailer not attached. Reverse carefully to the dock.")
-    if gear == "Reverse" and speed > 0 and speed < 10:
-        if st.button("🔗 COUPLER: ATTACH LOAD"):
-            st.session_state.attached = True
-            st.session_state.log.append("Load successfully attached in Florida.")
-            st.balloons()
-            st.rerun()
-else:
-    st.success("✅ STATUS: Trailer Locked. Destination: New York via I-95.")
-
-# --- 5. THE HIGHWAY MAP (SIMULATION) ---
-st.markdown("### 🗺️ REAL-TIME ROAD DATA")
-states = ["Florida", "Georgia", "South Carolina", "North Carolina", "Virginia", "New Jersey", "New York"]
-
-if st.session_state.attached and speed > 50:
-    time.sleep(0.5)
-    current_idx = states.index(st.session_state.location)
-    if current_idx < len(states) - 1:
-        st.session_state.location = states[current_idx + 1]
-        st.session_state.fuel -= 10
-        st.session_state.log.append(f"Passed through {st.session_state.location}")
-
-# Visual Representation of the Truck
-truck_color = "#00209F" # Haiti Blue
-trailer_color = "#D21034" # Haiti Red
-
-st.markdown(f"""
-    <div style='background-color: #333; padding: 50px; border-radius: 10px; text-align: center;'>
-        <div style='display: inline-block; width: 60px; height: 40px; background-color: {truck_color}; border: 2px solid white;'>CAB</div>
-        {"<div style='display: inline-block; width: 150px; height: 45px; background-color: " + trailer_color + "; border: 2px solid white;'>LOAD</div>" if st.session_state.attached else ""}
-        <div style='color: white; margin-top: 20px;'>HIGHWAY: I-95 NORTHBOUND</div>
+# --- 3. THE LIVE GAME ENGINE (HTML5/CANVAS) ---
+# This section handles the real-time movement, arrows, and enter key.
+game_html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {{ background-color: #222; color: white; font-family: sans-serif; text-align: center; margin: 0; overflow: hidden; }}
+        canvas {{ background-color: #444; border: 5px solid #00209F; display: block; margin: 0 auto; }}
+        .dash {{ background: #111; padding: 10px; border-bottom: 4px solid #D21034; display: flex; justify-content: space-around; }}
+        .stat {{ font-size: 20px; font-weight: bold; color: #00FF41; }}
+    </style>
+</head>
+<body>
+    <div class="dash">
+        <div id="sp">SPEED: 0 MPH</div>
+        <div id="st">STATUS: LOCATE TRAILER</div>
+        <div style="color: #FFD700;">{COMPANY}</div>
     </div>
-""", unsafe_allow_html=True)
+    <canvas id="truckCanvas" width="800" height="500"></canvas>
+    <p>USE ARROWS TO DRIVE | ENTER TO BRAKE | SHIFT FOR CLUTCH</p>
 
-# --- 6. FOOTER & CREDENTIALS ---
+    <script>
+        const canvas = document.getElementById('truckCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let truck = {{ x: 400, y: 400, angle: 0, speed: 0, attached: false }};
+        let trailer = {{ x: 400, y: 100, attached: false }};
+        let keys = {{}};
+
+        window.addEventListener('keydown', e => {{ keys[e.code] = true; }});
+        window.addEventListener('keyup', e => {{ keys[e.code] = false; }});
+
+        function update() {{
+            // 1. Driving Logic
+            if (keys['ArrowUp']) truck.speed += 0.1;
+            if (keys['ArrowDown']) truck.speed -= 0.1;
+            if (keys['Enter']) truck.speed *= 0.8; // Air Brakes
+            
+            if (Math.abs(truck.speed) > 0.1) {{
+                if (keys['ArrowLeft']) truck.angle -= 0.05;
+                if (keys['ArrowRight']) truck.angle += 0.05;
+            }}
+
+            truck.speed *= 0.99; // Friction
+            truck.x += Math.cos(truck.angle) * truck.speed;
+            truck.y += Math.sin(truck.angle) * truck.speed;
+
+            // 2. Attachment Logic (Fifth Wheel)
+            let dist = Math.sqrt((truck.x-trailer.x)**2 + (truck.y-trailer.y)**2);
+            if (dist < 30 && !truck.attached && Math.abs(truck.speed) < 1) {{
+                truck.attached = True;
+                document.getElementById('st').innerText = "STATUS: LOAD ATTACHED - HEAD NORTH";
+            }}
+
+            draw();
+            document.getElementById('sp').innerText = "SPEED: " + Math.round(truck.speed * 10) + " MPH";
+            requestAnimationFrame(update);
+        }}
+
+        function draw() {{
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw Road Marks
+            ctx.strokeStyle = "yellow"; ctx.setLineDash([20, 20]);
+            ctx.beginPath(); ctx.moveTo(400,0); ctx.lineTo(400,500); ctx.stroke();
+
+            // Draw Trailer (Haiti Red)
+            if (!truck.attached) {{
+                ctx.fillStyle = "#D21034";
+                ctx.fillRect(trailer.x-20, trailer.y-40, 40, 80);
+            }}
+
+            // Draw Truck (Haiti Blue)
+            ctx.save();
+            ctx.translate(truck.x, truck.y);
+            ctx.rotate(truck.angle);
+            ctx.fillStyle = "#00209F";
+            ctx.fillRect(-15, -25, 30, 50); // Cab
+            ctx.fillStyle = "black";
+            ctx.fillRect(-18, -20, 5, 10); ctx.fillRect(13, -20, 5, 10); // Tires
+            ctx.restore();
+        }}
+
+        update();
+    </script>
+</body>
+</html>
+"""
+
+# Render the game
+components.html(game_html, height=650)
+
+# --- 4. FOOTER ---
 st.markdown("---")
-c1, c2 = st.columns(2)
-with c1:
-    st.subheader("📋 DRIVER LOG")
-    for entry in st.session_state.log[-5:]:
-        st.text(f"🕒 {entry}")
-with c2:
-    st.subheader("🏢 COMPANY INFO")
-    st.write(f"**Company:** {COMPANY}")
-    st.write(f"**Project Lead:** {OWNER}")
-    st.write(f"**Contact:** {CONTACT}")
-
-if st.button("RESET SIMULATOR / LOGOUT"):
-    st.session_state.auth = False
-    st.session_state.attached = False
-    st.session_state.location = "Florida"
-    st.rerun()
+st.write(f"**Owner:** {OWNER} | **Email:** {CONTACT}")
+st.write(f"**Instruction:** Click the game screen once to activate the keyboard controls.")
