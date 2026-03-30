@@ -1,125 +1,150 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-# --- 1. CREDENTIALS & SYSTEM CONFIG ---
+# --- CREDENTIALS ---
 COMPANY = "GlobalInternet.py"
 OWNER = "Gesner Deslandes"
 CONTACT = "deslandes78@gmail.com | (509)-4738-5663"
 PASSWORD_REQUIRED = "20082010"
 
-st.set_page_config(page_title="Haiti Truck Innovation", layout="wide")
+st.set_page_config(page_title="Haiti Truck Innovation 3D", layout="wide")
 
-# --- 2. LOGIN GATE ---
-if 'authenticated' not in st.session_state:
-    st.session_state.authenticated = False
+# --- LOGIN GATE ---
+if 'auth' not in st.session_state:
+    st.session_state.auth = False
 
-if not st.session_state.authenticated:
+if not st.session_state.auth:
     st.markdown(f"<h1 style='text-align:center; color:#00209F;'>🇭🇹 {COMPANY}</h1>", unsafe_allow_html=True)
-    st.markdown(f"<h3 style='text-align:center; color:#D21034;'>Haiti Truck Innovation - Login</h3>", unsafe_allow_html=True)
-    
-    pwd = st.text_input("Enter Access Code:", type="password")
-    if st.button("START ENGINE"):
+    pwd = st.text_input("ENTER SYSTEM ACCESS KEY:", type="password")
+    if st.button("IGNITION"):
         if pwd == PASSWORD_REQUIRED:
-            st.session_state.authenticated = True
+            st.session_state.auth = True
             st.rerun()
-        else:
-            st.error("Invalid Code")
     st.stop()
 
-# --- 3. THE LIVE GAME ENGINE (HTML5/CANVAS) ---
-# This section handles the real-time movement, arrows, and enter key.
-game_html = f"""
+# --- THE 3D ENGINE (THREE.JS) ---
+# This creates a 3D world with lighting, textures, and physics.
+game_3d_html = f"""
 <!DOCTYPE html>
 <html>
 <head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
-        body {{ background-color: #222; color: white; font-family: sans-serif; text-align: center; margin: 0; overflow: hidden; }}
-        canvas {{ background-color: #444; border: 5px solid #00209F; display: block; margin: 0 auto; }}
-        .dash {{ background: #111; padding: 10px; border-bottom: 4px solid #D21034; display: flex; justify-content: space-around; }}
-        .stat {{ font-size: 20px; font-weight: bold; color: #00FF41; }}
+        body {{ margin: 0; background: #000; color: white; font-family: 'Arial', sans-serif; overflow: hidden; }}
+        #ui {{ position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.7); padding: 20px; border-left: 5px solid #D21034; }}
+        .gauge {{ font-size: 24px; color: #00FF41; font-family: monospace; }}
+        canvas {{ display: block; }}
     </style>
 </head>
 <body>
-    <div class="dash">
-        <div id="sp">SPEED: 0 MPH</div>
-        <div id="st">STATUS: LOCATE TRAILER</div>
-        <div style="color: #FFD700;">{COMPANY}</div>
+    <div id="ui">
+        <div style="color:#00209F; font-weight:bold;">{GAME_NAME if 'GAME_NAME' in locals() else "HAITI TRUCK INNOVATION"}</div>
+        <div class="gauge" id="speedDisplay">0 MPH</div>
+        <div id="status">STATUS: DRIVE TO THE LOAD</div>
+        <div style="font-size:10px; margin-top:10px;">ARROWS: Drive | ENTER: Air Brakes | SHIFT: Clutch</div>
     </div>
-    <canvas id="truckCanvas" width="800" height="500"></canvas>
-    <p>USE ARROWS TO DRIVE | ENTER TO BRAKE | SHIFT FOR CLUTCH</p>
 
     <script>
-        const canvas = document.getElementById('truckCanvas');
-        const ctx = canvas.getContext('2d');
-
-        let truck = {{ x: 400, y: 400, angle: 0, speed: 0, attached: false }};
-        let trailer = {{ x: 400, y: 100, attached: false }};
+        let scene, camera, renderer, truck, road, trailer;
+        let speed = 0, angle = 0;
         let keys = {{}};
 
-        window.addEventListener('keydown', e => {{ keys[e.code] = true; }});
-        window.addEventListener('keyup', e => {{ keys[e.code] = false; }});
+        function init() {{
+            scene = new THREE.Scene();
+            scene.fog = new THREE.Fog(0x222222, 10, 100);
 
-        function update() {{
-            // 1. Driving Logic
-            if (keys['ArrowUp']) truck.speed += 0.1;
-            if (keys['ArrowDown']) truck.speed -= 0.1;
-            if (keys['Enter']) truck.speed *= 0.8; // Air Brakes
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({{ antialias: true }});
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            // Lighting
+            const light = new THREE.DirectionalLight(0xffffff, 1);
+            light.position.set(5, 10, 7.5);
+            scene.add(light);
+            scene.add(new THREE.AmbientLight(0x404040));
+
+            // Road
+            const roadGeo = new THREE.PlaneGeometry(20, 2000);
+            const roadMat = new THREE.MeshPhongMaterial({{ color: 0x111111 }});
+            road = new THREE.Mesh(roadGeo, roadMat);
+            road.rotation.x = -Math.PI / 2;
+            scene.add(road);
+
+            // High-Detail Truck (Composite Group)
+            truck = new THREE.Group();
             
-            if (Math.abs(truck.speed) > 0.1) {{
-                if (keys['ArrowLeft']) truck.angle -= 0.05;
-                if (keys['ArrowRight']) truck.angle += 0.05;
-            }}
+            // Main Chassis (Haiti Blue)
+            const bodyGeo = new THREE.BoxGeometry(2, 1.5, 4);
+            const bodyMat = new THREE.MeshPhongMaterial({{ color: 0x00209F }});
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            truck.add(body);
 
-            truck.speed *= 0.99; // Friction
-            truck.x += Math.cos(truck.angle) * truck.speed;
-            truck.y += Math.sin(truck.angle) * truck.speed;
+            // The Cab (Chrome/Glass Look)
+            const cabGeo = new THREE.BoxGeometry(1.9, 1.2, 1.5);
+            const cabMat = new THREE.MeshPhongMaterial({{ color: 0x555555, shininess: 100 }});
+            const cab = new THREE.Mesh(cabGeo, cabMat);
+            cab.position.set(0, 0.8, 1);
+            truck.add(cab);
 
-            // 2. Attachment Logic (Fifth Wheel)
-            let dist = Math.sqrt((truck.x-trailer.x)**2 + (truck.y-trailer.y)**2);
-            if (dist < 30 && !truck.attached && Math.abs(truck.speed) < 1) {{
-                truck.attached = True;
-                document.getElementById('st').innerText = "STATUS: LOAD ATTACHED - HEAD NORTH";
-            }}
+            // Smoke Stacks (Big Truck Style)
+            const stackGeo = new THREE.CylinderGeometry(0.1, 0.1, 2);
+            const stackMat = new THREE.MeshPhongMaterial({{ color: 0xaaaaaa }});
+            const stackL = new THREE.Mesh(stackGeo, stackMat);
+            stackL.position.set(-0.9, 1.2, 0);
+            truck.add(stackL);
+            
+            scene.add(truck);
 
-            draw();
-            document.getElementById('sp').innerText = "SPEED: " + Math.round(truck.speed * 10) + " MPH";
-            requestAnimationFrame(update);
+            // Trailer (Haiti Red) - Placed down the road
+            trailer = new THREE.Mesh(new THREE.BoxGeometry(2.2, 2.5, 8), new THREE.MeshPhongMaterial({{ color: 0xD21034 }}));
+            trailer.position.set(0, 1.25, -20);
+            scene.add(trailer);
+
+            camera.position.set(0, 5, 10);
+            animate();
         }}
 
-        function draw() {{
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // Draw Road Marks
-            ctx.strokeStyle = "yellow"; ctx.setLineDash([20, 20]);
-            ctx.beginPath(); ctx.moveTo(400,0); ctx.lineTo(400,500); ctx.stroke();
+        window.addEventListener('keydown', e => keys[e.code] = true);
+        window.addEventListener('keyup', e => keys[e.code] = false);
 
-            // Draw Trailer (Haiti Red)
-            if (!truck.attached) {{
-                ctx.fillStyle = "#D21034";
-                ctx.fillRect(trailer.x-20, trailer.y-40, 40, 80);
+        function animate() {{
+            requestAnimationFrame(animate);
+
+            // Physics Logic
+            if (keys['ArrowUp']) speed += 0.005;
+            if (keys['ArrowDown']) speed -= 0.005;
+            if (keys['Enter']) speed *= 0.9; // Air Brakes
+            
+            if (Math.abs(speed) > 0.01) {{
+                if (keys['ArrowLeft']) truck.rotation.y += 0.02;
+                if (keys['ArrowRight']) truck.rotation.y -= 0.02;
             }}
 
-            // Draw Truck (Haiti Blue)
-            ctx.save();
-            ctx.translate(truck.x, truck.y);
-            ctx.rotate(truck.angle);
-            ctx.fillStyle = "#00209F";
-            ctx.fillRect(-15, -25, 30, 50); // Cab
-            ctx.fillStyle = "black";
-            ctx.fillRect(-18, -20, 5, 10); ctx.fillRect(13, -20, 5, 10); // Tires
-            ctx.restore();
+            speed *= 0.98; // Friction
+            truck.position.x += Math.sin(truck.rotation.y) * speed * -10;
+            truck.position.z += Math.cos(truck.rotation.y) * speed * -10;
+
+            // Camera follow (Video Game Style)
+            camera.position.x = truck.position.x + Math.sin(truck.rotation.y) * 12;
+            camera.position.z = truck.position.z + Math.cos(truck.rotation.y) * 12;
+            camera.lookAt(truck.position);
+
+            // HUD update
+            document.getElementById('speedDisplay').innerText = Math.abs(Math.round(speed * 500)) + " MPH";
+
+            renderer.render(scene, camera);
         }}
 
-        update();
+        init();
     </script>
 </body>
 </html>
 """
 
-# Render the game
-components.html(game_html, height=650)
+# Render full screen
+components.html(game_3d_html, height=800)
 
-# --- 4. FOOTER ---
+# --- CREDENTIALS FOOTER ---
 st.markdown("---")
-st.write(f"**Owner:** {OWNER} | **Email:** {CONTACT}")
-st.write(f"**Instruction:** Click the game screen once to activate the keyboard controls.")
+st.write(f"**Developer:** {OWNER} | **Company:** {COMPANY} | **Contact:** {CONTACT}")
