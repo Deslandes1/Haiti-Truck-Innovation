@@ -5,7 +5,7 @@ import streamlit.components.v1 as components
 OWNER = "Gesner Deslandes"
 COMPANY = "EduHumanity"
 
-st.set_page_config(page_title="Haiti Truck Pro - High Beams", layout="wide")
+st.set_page_config(page_title="Haiti Truck Pro - Collision Mode", layout="wide")
 
 sim_html = f"""
 <!DOCTYPE html>
@@ -15,30 +15,37 @@ sim_html = f"""
     <style>
         body {{ margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }}
         #ui {{ position: absolute; top: 20px; left: 20px; z-index: 100; }}
-        .btn {{ padding: 12px 24px; background: #D21034; color: white; border: 2px solid #fff; cursor: pointer; font-weight: bold; border-radius: 5px; }}
+        .btn {{ padding: 12px 24px; background: #D21034; color: white; border: 2px solid #fff; cursor: pointer; font-weight: bold; border-radius: 5px; margin-bottom: 10px; }}
         #dash {{ position: absolute; bottom: 0; width: 100%; height: 140px; background: #111; color: #00FF41; display: flex; justify-content: space-around; align-items: center; border-top: 4px solid #444; z-index: 50; }}
-        #start {{ position: absolute; width: 100%; height: 100%; background: #000; color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 200; cursor: pointer; text-align: center; }}
+        #overlay {{ position: absolute; width: 100%; height: 100%; background: #000; color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 200; cursor: pointer; text-align: center; }}
+        #crash-screen {{ position: absolute; width: 100%; height: 100%; background: rgba(210, 16, 52, 0.8); color: white; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 300; text-align: center; }}
     </style>
 </head>
 <body>
-    <div id="start" onclick="this.style.display='none'; init();">
+    <div id="overlay" onclick="this.style.display='none'; init();">
         <h1 style="color:#D21034;">🇭🇹 {COMPANY}</h1>
-        <p>NIGHT HIGH-BEAMS ENABLED</p>
-        <h2 style="background:#00209F; padding:10px 30px; border-radius:5px;">CLICK TO START</h2>
+        <p>STAY ON THE ROAD OR THE ENGINE WILL STALL</p>
+        <h2 style="background:#00209F; padding:10px 30px; border-radius:5px;">CLICK TO DRIVE</h2>
+    </div>
+
+    <div id="crash-screen">
+        <h1 style="font-size: 50px;">💥 TRUCK STALLED!</h1>
+        <p>YOU HIT AN OBSTACLE OUTSIDE THE ROAD</p>
+        <button class="btn" onclick="location.reload()">CLICK TO START OVER</button>
     </div>
 
     <div id="ui">
-        <button class="btn" onclick="toggleTime()">TOGGLE DAY / NIGHT (N)</button>
+        <button class="btn" onclick="toggleTime()">DAY / NIGHT (N)</button>
     </div>
 
     <div id="dash">
         <div style="text-align:center;">SPEED<br><span id="sp" style="font-size:35px;">0</span> MPH</div>
-        <div style="color:white; text-align:center;"><b>{OWNER}</b><br><small>EDUHUMANITY 2026</small></div>
-        <div style="text-align:center;">LIGHTS<br><span id="lt" style="color:#FFD700;">OFF</span></div>
+        <div style="color:white; text-align:center;"><b>{OWNER}</b><br><small>EDUHUMANITY</small></div>
+        <div style="text-align:center;">STATUS<br><span id="st" style="color:#00FF41;">DRIVING</span></div>
     </div>
 
     <script>
-        let scene, camera, renderer, wheel, headLight, road = [], speed = 0, tx = 0, targetX = 0, isNight = false, osc;
+        let scene, camera, renderer, wheel, headLight, road = [], speed = 0, tx = 0, targetX = 0, isNight = false, isCrashed = false, osc;
 
         function init() {{
             let ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -55,16 +62,10 @@ sim_html = f"""
             
             let amb = new THREE.AmbientLight(0xffffff, 0.8); scene.add(amb); scene.amb = amb;
 
-            // --- THE HIGH-BEAM HEADLIGHT ---
-            headLight = new THREE.SpotLight(0xffffff, 0); // Start off
-            headLight.distance = 2500;
-            headLight.angle = 0.4;
-            headLight.penumbra = 0.3;
-            headLight.decay = 1;
-            scene.add(headLight);
-            scene.add(headLight.target);
+            headLight = new THREE.SpotLight(0xffffff, 0);
+            headLight.distance = 2500; headLight.angle = 0.4; scene.add(headLight); scene.add(headLight.target);
 
-            // Cockpit: Wheel & Hands
+            // Cockpit
             wheel = new THREE.Group();
             let wM = new THREE.Mesh(new THREE.TorusGeometry(3.5, 0.6, 12, 40), new THREE.MeshPhongMaterial({{color: 0x222222}}));
             wheel.add(wM);
@@ -74,28 +75,27 @@ sim_html = f"""
             wheel.add(L); wheel.add(R);
             wheel.position.set(0, 9, -7); wheel.rotation.x = 1.1; scene.add(wheel);
 
-            // Straight Road & Landscape
+            // World Construction
             for(let i=0; i<120; i++) {{
                 let s = new THREE.Group();
                 let gr = new THREE.Mesh(new THREE.PlaneGeometry(4000, 200), new THREE.MeshPhongMaterial({{color: 0x2d5a27}}));
-                let rd = new THREE.Mesh(new THREE.PlaneGeometry(160, 200), new THREE.MeshPhongMaterial({{color: 0x1a1a1a}}));
+                let rd = new THREE.Mesh(new THREE.PlaneGeometry(180, 200), new THREE.MeshPhongMaterial({{color: 0x1a1a1a}}));
                 let ln = new THREE.Mesh(new THREE.PlaneGeometry(5, 80), new THREE.MeshBasicMaterial({{color: 0xFFD700}}));
                 gr.rotation.x = rd.rotation.x = ln.rotation.x = -Math.PI/2;
                 rd.position.y = 0.1; ln.position.y = 0.2; s.add(gr); s.add(rd); s.add(ln);
 
                 if(i%8==0) {{
-                    let house = new THREE.Mesh(new THREE.BoxGeometry(40, 30, 40), new THREE.MeshPhongMaterial({{color: i%16==0?0x00209F:0xD21034}}));
-                    house.position.set(i%16==0?250:-250, 15, 0); s.add(house);
-                    let palm = new THREE.Mesh(new THREE.CylinderGeometry(2,3,50), new THREE.MeshPhongMaterial({{color:0x4d3319}}));
-                    palm.position.set(i%16==0?-220:220, 25, 0); s.add(palm);
+                    let house = new THREE.Mesh(new THREE.BoxGeometry(50, 35, 50), new THREE.MeshPhongMaterial({{color: i%16==0?0x00209F:0xD21034}}));
+                    house.position.set(i%16==0?280:-280, 17.5, 0); s.add(house);
                 }}
                 s.position.z = -i * 200; scene.add(s); road.push(s);
             }}
 
             window.addEventListener('keydown', e => {{ 
+                if(isCrashed) return;
                 if(e.key=='ArrowUp') speed += 0.001; 
-                if(e.key=='ArrowLeft') targetX -= 3; 
-                if(e.key=='ArrowRight') targetX += 3;
+                if(e.key=='ArrowLeft') targetX -= 3.5; 
+                if(e.key=='ArrowRight') targetX += 3.5;
                 if(e.key.toLowerCase()=='n') toggleTime();
             }});
             animate();
@@ -106,26 +106,39 @@ sim_html = f"""
             let c = isNight ? 0x00050a : 0x87CEEB;
             scene.background = new THREE.Color(c); scene.fog.color = new THREE.Color(c);
             scene.amb.intensity = isNight ? 0.05 : 0.8;
-            headLight.intensity = isNight ? 3.5 : 0; // Turn on high beams at night
-            document.getElementById('lt').innerText = isNight ? "HIGH BEAMS" : "OFF";
-            document.getElementById('lt').style.color = isNight ? "#fff" : "#FFD700";
+            headLight.intensity = isNight ? 4.0 : 0;
         }}
 
         function animate() {{
+            if(isCrashed) return;
             requestAnimationFrame(animate);
+            
             speed *= 0.992; tx += (targetX - tx) * 0.1;
             
-            // Lock camera, wheel, and high-beams to steering
+            // Collision Logic: Road width is 180. If truck (tx) > 85 or < -85, it's off-road.
+            if (Math.abs(tx) > 88) {{
+                isCrashed = true;
+                document.getElementById('crash-screen').style.display = 'flex';
+                document.getElementById('st').innerText = 'STALLED';
+                document.getElementById('st').style.color = '#D21034';
+                if(osc) osc.stop();
+                return;
+            }}
+
             wheel.position.x = tx; 
             wheel.rotation.z = (targetX - tx) * -0.15;
             camera.position.set(tx, 14, 0); camera.lookAt(tx, 12, -200);
             
             headLight.position.set(tx, 10, -5);
-            headLight.target.position.set(tx, 0, -1000); // PROJECT FAR AHEAD
+            headLight.target.position.set(tx, 0, -1000);
 
-            road.forEach(s => {{ s.position.z += speed * 3500; if(s.position.z > 800) s.position.z -= 120 * 200; }});
-            document.getElementById('sp').innerText = Math.round(speed * 28000);
-            if(osc) osc.frequency.value = 25 + (speed * 9500);
+            road.forEach(s => {{ 
+                s.position.z += speed * 4000; 
+                if(s.position.z > 800) s.position.z -= 120 * 200; 
+            }});
+
+            document.getElementById('sp').innerText = Math.round(speed * 30000);
+            if(osc) osc.frequency.value = 25 + (speed * 10000);
             renderer.render(scene, camera);
         }}
     </script>
