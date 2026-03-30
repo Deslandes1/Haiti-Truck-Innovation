@@ -5,7 +5,7 @@ import streamlit.components.v1 as components
 OWNER = "Gesner Deslandes"
 COMPANY = "EduHumanity"
 
-st.set_page_config(page_title="Haiti Truck - Centered LHD", layout="wide")
+st.set_page_config(page_title="Haiti Truck - Master Center", layout="wide")
 
 sim_html = f"""
 <!DOCTYPE html>
@@ -16,29 +16,29 @@ sim_html = f"""
         body {{ margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }}
         #ui {{ position: absolute; top: 20px; left: 20px; z-index: 100; }}
         .btn {{ padding: 10px 20px; background: #D21034; color: white; border: 2px solid #fff; cursor: pointer; font-weight: bold; border-radius: 5px; }}
-        #hud {{ position: absolute; bottom: 0; width: 100%; height: 100px; background: #050505; color: #00FF41; display: flex; justify-content: space-around; align-items: center; border-top: 3px solid #D21034; z-index: 50; }}
+        #hud {{ position: absolute; bottom: 0; width: 100%; height: 100px; background: #080808; color: #00FF41; display: flex; justify-content: space-around; align-items: center; border-top: 4px solid #333; z-index: 50; }}
         #start {{ position: absolute; width: 100%; height: 100%; background: #000; color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 200; cursor: pointer; }}
-        #crash-screen {{ position: absolute; width: 100%; height: 100%; background: rgba(210, 16, 52, 0.9); color: white; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 300; }}
+        #crash {{ position: absolute; width: 100%; height: 100%; background: rgba(210, 16, 52, 0.95); color: white; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 300; }}
     </style>
 </head>
 <body>
     <div id="start" onclick="this.style.display='none'; init();">
         <h1 style="color:#D21034;">🇭🇹 {COMPANY}</h1>
-        <p>CENTERED CABIN | LEFT-HAND DRIVE FIXED</p>
-        <h2 style="background:#00209F; padding:10px 30px; border-radius:5px;">START TRUCK</h2>
+        <p>MASTER CABIN ALIGNMENT | LHD & AUTOMATIC</p>
+        <h2 style="background:#00209F; padding:10px 40px; border-radius:5px;">ENGAGE ENGINE</h2>
     </div>
 
-    <div id="crash-screen">
-        <h1>💥 ACCIDENT DETECTED</h1>
-        <button class="btn" onclick="location.reload()">START OVER</button>
+    <div id="crash">
+        <h1>💥 CABIN CRUSHED</h1>
+        <button class="btn" onclick="location.reload()">RESTART SIMULATION</button>
     </div>
 
     <div id="ui"><button class="btn" onclick="toggleTime()">DAY / NIGHT (N)</button></div>
 
     <div id="hud">
-        <div><b>{OWNER}</b></div>
-        <div style="font-size:20px;">SPEED: <span id="sp">0</span> MPH</div>
-        <div style="font-size:20px;">GEAR: <span style="color:#fff;">[D]</span></div>
+        <div>DRIVER: <b>{OWNER}</b></div>
+        <div style="font-size:22px;">SPEED: <span id="sp">0</span> MPH</div>
+        <div style="font-size:22px;">GEAR: <span style="color:#fff;">[D]</span></div>
     </div>
 
     <script>
@@ -52,74 +52,75 @@ sim_html = f"""
 
             scene = new THREE.Scene(); 
             scene.background = new THREE.Color(0x87CEEB);
-            scene.fog = new THREE.Fog(0x87CEEB, 1, 7000);
+            scene.fog = new THREE.Fog(0x87CEEB, 1, 8000);
             
-            camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 20000);
+            // Wider FOV (80) to see the whole centered cabin
+            camera = new THREE.PerspectiveCamera(80, window.innerWidth/window.innerHeight, 0.1, 25000);
             renderer = new THREE.WebGLRenderer({{antialias: true}});
             renderer.setSize(window.innerWidth, window.innerHeight); document.body.appendChild(renderer.domElement);
             
             let amb = new THREE.AmbientLight(0xffffff, 1.0); scene.add(amb); scene.amb = amb;
 
-            // --- THE CABIN SYSTEM (CENTERED) ---
+            // --- THE MASTER CENTERED CABIN ---
             cabin = new THREE.Group();
-            let cMat = new THREE.MeshPhongMaterial({{color: 0x1a1a1a}});
+            let cMat = new THREE.MeshPhongMaterial({{color: 0x151515}});
             
-            // Dashboard (Centered horizontally at 0)
-            let dash = new THREE.Mesh(new THREE.BoxGeometry(150, 25, 40), cMat);
-            dash.position.set(0, 5, -20);
+            // Dashboard - centered at 0
+            let dash = new THREE.Mesh(new THREE.BoxGeometry(200, 30, 50), cMat);
+            dash.position.set(0, 5, -25);
             cabin.add(dash);
 
-            // Left Steering Wheel (Shifted to the left -25)
+            // Left-Hand Steering Wheel (Shifted left to -35)
             wheel = new THREE.Group();
-            let wR = new THREE.Mesh(new THREE.TorusGeometry(6, 1.2, 12, 40), new THREE.MeshPhongMaterial({{color: 0x000}}));
+            let wR = new THREE.Mesh(new THREE.TorusGeometry(7, 1.4, 12, 40), new THREE.MeshPhongMaterial({{color: 0x000}}));
             wheel.add(wR);
             let hM = new THREE.MeshPhongMaterial({{color: 0x5c4033}});
-            let L = new THREE.Mesh(new THREE.BoxGeometry(2.5, 8, 2.5), hM); L.position.set(-6, 0, 1);
-            let R = L.clone(); R.position.set(6, 0, 1);
+            let L = new THREE.Mesh(new THREE.BoxGeometry(3, 10, 3), hM); L.position.set(-7, 0, 1);
+            let R = L.clone(); R.position.set(7, 0, 1);
             wheel.add(L); wheel.add(R);
-            wheel.position.set(-25, 18, -30); wheel.rotation.x = 1.35;
+            wheel.position.set(-35, 20, -35); wheel.rotation.x = 1.4;
             cabin.add(wheel);
 
-            // Automatic Shifter (Shifted to center-right +15)
+            // Automatic Transmission Shifter (Shifted right to +15)
             let gear = new THREE.Group();
-            let gB = new THREE.Mesh(new THREE.BoxGeometry(10, 6, 15), new THREE.MeshPhongMaterial({{color: 0x111}}));
-            let gS = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 10), new THREE.MeshPhongMaterial({{color: 0x777}}));
-            gS.position.y = 5; gS.rotation.x = -0.3;
+            let gB = new THREE.Mesh(new THREE.BoxGeometry(12, 8, 20), new THREE.MeshPhongMaterial({{color: 0x080808}}));
+            let gS = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 12), new THREE.MeshPhongMaterial({{color: 0x888}}));
+            gS.position.y = 6; gS.rotation.x = -0.4;
             gear.add(gB); gear.add(gS);
-            gear.position.set(15, 12, -30);
+            gear.position.set(15, 12, -35);
             cabin.add(gear);
 
-            // Frame Pillars (Equally spaced from 0)
-            let pL = new THREE.Mesh(new THREE.BoxGeometry(5, 100, 5), cMat);
-            pL.position.set(-60, 40, -15); pL.rotation.z = 0.15;
+            // Symmetrical Window Pillars
+            let pL = new THREE.Mesh(new THREE.BoxGeometry(6, 120, 6), cMat);
+            pL.position.set(-85, 50, -20); pL.rotation.z = 0.12;
             cabin.add(pL);
-            let pR = pL.clone(); pR.position.x = 60; pR.rotation.z = -0.15;
+            let pR = pL.clone(); pR.position.x = 85; pR.rotation.z = -0.12;
             cabin.add(pR);
 
             scene.add(cabin);
 
-            // Road & Houses
+            // Infinite Road
             for(let i=0; i<100; i++) {{
                 let s = new THREE.Group();
-                let gr = new THREE.Mesh(new THREE.PlaneGeometry(8000, 450), new THREE.MeshPhongMaterial({{color: 0x2d5a27}}));
-                let rd = new THREE.Mesh(new THREE.PlaneGeometry(400, 450), new THREE.MeshPhongMaterial({{color: 0x1a1a1a}}));
-                let ln = new THREE.Mesh(new THREE.PlaneGeometry(15, 180), new THREE.MeshBasicMaterial({{color: 0xFFD700}}));
+                let gr = new THREE.Mesh(new THREE.PlaneGeometry(10000, 500), new THREE.MeshPhongMaterial({{color: 0x2d5a27}}));
+                let rd = new THREE.Mesh(new THREE.PlaneGeometry(450, 500), new THREE.MeshPhongMaterial({{color: 0x111111}}));
+                let ln = new THREE.Mesh(new THREE.PlaneGeometry(18, 200), new THREE.MeshBasicMaterial({{color: 0xFFD700}}));
                 gr.rotation.x = rd.rotation.x = ln.rotation.x = -Math.PI/2;
                 rd.position.y = 0.1; ln.position.y = 0.2; s.add(gr); s.add(rd); s.add(ln);
 
                 if(i%10==0) {{
-                    let house = new THREE.Mesh(new THREE.BoxGeometry(120, 90, 120), new THREE.MeshPhongMaterial({{color: 0xD21034}}));
-                    let side = (i%20==0)? 750 : -750;
-                    house.position.set(side, 45, 0); s.add(house); s.houseX = side;
+                    let house = new THREE.Mesh(new THREE.BoxGeometry(140, 100, 140), new THREE.MeshPhongMaterial({{color: 0xD21034}}));
+                    let side = (i%20==0)? 900 : -900;
+                    house.position.set(side, 50, 0); s.add(house); s.houseX = side;
                 }}
-                s.position.z = -i * 450; scene.add(s); road.push(s);
+                s.position.z = -i * 500; scene.add(s); road.push(s);
             }}
 
             window.addEventListener('keydown', e => {{ 
                 if(isCrashed) return;
-                if(e.key=='ArrowUp') speed += 0.0025; 
-                if(e.key=='ArrowLeft') targetX -= 8; 
-                if(e.key=='ArrowRight') targetX += 8;
+                if(e.key=='ArrowUp') speed += 0.0028; 
+                if(e.key=='ArrowLeft') targetX -= 10; 
+                if(e.key=='ArrowRight') targetX += 10;
                 if(e.key.toLowerCase()=='n') toggleTime();
             }});
             animate();
@@ -138,25 +139,25 @@ sim_html = f"""
             speed *= 0.996; tx += (targetX - tx) * 0.1;
             
             road.forEach(seg => {{ 
-                seg.position.z += speed * 9000; 
-                if(seg.position.z > 1500) seg.position.z -= 100 * 450; 
-                if(Math.abs(seg.position.z) < 100 && seg.houseX && Math.abs(tx - seg.houseX) < 180) {{
+                seg.position.z += speed * 10000; 
+                if(seg.position.z > 1500) seg.position.z -= 100 * 500; 
+                if(Math.abs(seg.position.z) < 120 && seg.houseX && Math.abs(tx - seg.houseX) < 220) {{
                     isCrashed = true;
-                    document.getElementById('crash-screen').style.display = 'flex';
+                    document.getElementById('crash').style.display = 'flex';
                     if(osc) osc.stop();
                 }}
             }});
 
-            // Align the Cabin to the truck's steering (tx)
+            // The Cabin group moves with the center of the road (tx)
             cabin.position.x = tx; 
             wheel.rotation.z = (targetX - tx) * -0.2;
             
-            // Set Camera to the Driver's eye level, offset left (-25)
-            camera.position.set(tx - 25, 32, 45); 
-            camera.lookAt(tx - 25, 22, -400);
+            // Eyes are behind the Left-Hand steering wheel (-35)
+            camera.position.set(tx - 35, 38, 55); 
+            camera.lookAt(tx - 35, 25, -500);
 
-            document.getElementById('sp').innerText = Math.round(speed * 55000);
-            if(osc) osc.frequency.value = 25 + (speed * 16000);
+            document.getElementById('sp').innerText = Math.round(speed * 60000);
+            if(osc) osc.frequency.value = 25 + (speed * 18000);
             renderer.render(scene, camera);
         }}
     </script>
