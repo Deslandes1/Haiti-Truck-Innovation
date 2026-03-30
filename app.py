@@ -1,12 +1,11 @@
 import streamlit as st
 import streamlit.components.v1 as components
-import time
 
 # --- PROJECT DATA ---
 OWNER = "Gesner Deslandes"
 COMPANY = "EduHumanity"
 
-st.set_page_config(page_title="Haiti Truck - Centered Cockpit", layout="wide")
+st.set_page_config(page_title="Haiti Truck - Centered LHD", layout="wide")
 
 sim_html = f"""
 <!DOCTYPE html>
@@ -25,13 +24,13 @@ sim_html = f"""
 <body>
     <div id="start" onclick="this.style.display='none'; init();">
         <h1 style="color:#D21034;">🇭🇹 {COMPANY}</h1>
-        <p>CENTERED CHASSIS | LEFT-HAND DRIVE</p>
-        <h2 style="background:#00209F; padding:10px 30px; border-radius:5px;">START ENGINE</h2>
+        <p>CENTERED CABIN | LEFT-HAND DRIVE FIXED</p>
+        <h2 style="background:#00209F; padding:10px 30px; border-radius:5px;">START TRUCK</h2>
     </div>
 
     <div id="crash-screen">
-        <h1>💥 TOTAL LOSS</h1>
-        <button class="btn" onclick="location.reload()">REDEPLOY TRUCK</button>
+        <h1>💥 ACCIDENT DETECTED</h1>
+        <button class="btn" onclick="location.reload()">START OVER</button>
     </div>
 
     <div id="ui"><button class="btn" onclick="toggleTime()">DAY / NIGHT (N)</button></div>
@@ -40,15 +39,13 @@ sim_html = f"""
         <div><b>{OWNER}</b></div>
         <div style="font-size:20px;">SPEED: <span id="sp">0</span> MPH</div>
         <div style="font-size:20px;">GEAR: <span style="color:#fff;">[D]</span></div>
-        <div style="font-size:20px;">TIME: <span id="clock">00:00</span></div>
     </div>
 
     <script>
         let scene, camera, renderer, cabin, wheel, road = [], speed = 0, tx = 0, targetX = 0;
-        let isNight = false, isCrashed = false, osc, startTime;
+        let isNight = false, isCrashed = false, osc;
 
         function init() {{
-            startTime = Date.now();
             let ctx = new (window.AudioContext || window.webkitAudioContext)();
             osc = ctx.createOscillator(); let g = ctx.createGain();
             osc.type = 'sawtooth'; g.gain.value = 0.02; osc.connect(g); g.connect(ctx.destination); osc.start();
@@ -63,66 +60,66 @@ sim_html = f"""
             
             let amb = new THREE.AmbientLight(0xffffff, 1.0); scene.add(amb); scene.amb = amb;
 
-            // --- CENTERED CABIN SYSTEM ---
+            // --- THE CABIN SYSTEM (CENTERED) ---
             cabin = new THREE.Group();
-            let cMat = new THREE.MeshPhongMaterial({{color: 0x222222}});
+            let cMat = new THREE.MeshPhongMaterial({{color: 0x1a1a1a}});
             
-            // Dashboard (Centered)
-            let dash = new THREE.Mesh(new THREE.BoxGeometry(100, 20, 30), cMat);
+            // Dashboard (Centered horizontally at 0)
+            let dash = new THREE.Mesh(new THREE.BoxGeometry(150, 25, 40), cMat);
             dash.position.set(0, 5, -20);
             cabin.add(dash);
 
-            // Left Steering Wheel (Offset -20 from center)
+            // Left Steering Wheel (Shifted to the left -25)
             wheel = new THREE.Group();
-            let wR = new THREE.Mesh(new THREE.TorusGeometry(5, 1, 12, 40), new THREE.MeshPhongMaterial({{color: 0x0a0a0a}}));
+            let wR = new THREE.Mesh(new THREE.TorusGeometry(6, 1.2, 12, 40), new THREE.MeshPhongMaterial({{color: 0x000}}));
             wheel.add(wR);
             let hM = new THREE.MeshPhongMaterial({{color: 0x5c4033}});
-            let L = new THREE.Mesh(new THREE.BoxGeometry(2, 7, 2), hM); L.position.set(-5, 0, 1);
-            let R = L.clone(); R.position.set(5, 0, 1);
+            let L = new THREE.Mesh(new THREE.BoxGeometry(2.5, 8, 2.5), hM); L.position.set(-6, 0, 1);
+            let R = L.clone(); R.position.set(6, 0, 1);
             wheel.add(L); wheel.add(R);
-            wheel.position.set(-20, 15, -25); wheel.rotation.x = 1.3;
+            wheel.position.set(-25, 18, -30); wheel.rotation.x = 1.35;
             cabin.add(wheel);
 
-            // Automatic Gear Selector (Offset +10 from center)
+            // Automatic Shifter (Shifted to center-right +15)
             let gear = new THREE.Group();
-            let gB = new THREE.Mesh(new THREE.BoxGeometry(8, 5, 12), new THREE.MeshPhongMaterial({{color: 0x111111}}));
-            let gS = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 8), new THREE.MeshPhongMaterial({{color: 0x666}}));
-            gS.position.y = 4; gS.rotation.x = -0.2;
+            let gB = new THREE.Mesh(new THREE.BoxGeometry(10, 6, 15), new THREE.MeshPhongMaterial({{color: 0x111}}));
+            let gS = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 10), new THREE.MeshPhongMaterial({{color: 0x777}}));
+            gS.position.y = 5; gS.rotation.x = -0.3;
             gear.add(gB); gear.add(gS);
-            gear.position.set(10, 10, -25);
+            gear.position.set(15, 12, -30);
             cabin.add(gear);
 
-            // Cabin Frames (Pillars)
-            let pL = new THREE.Mesh(new THREE.BoxGeometry(4, 80, 4), cMat);
-            pL.position.set(-45, 30, -15); pL.rotation.z = 0.2;
+            // Frame Pillars (Equally spaced from 0)
+            let pL = new THREE.Mesh(new THREE.BoxGeometry(5, 100, 5), cMat);
+            pL.position.set(-60, 40, -15); pL.rotation.z = 0.15;
             cabin.add(pL);
-            let pR = pL.clone(); pR.position.x = 45; pR.rotation.z = -0.2;
+            let pR = pL.clone(); pR.position.x = 60; pR.rotation.z = -0.15;
             cabin.add(pR);
 
             scene.add(cabin);
 
-            // Environment
+            // Road & Houses
             for(let i=0; i<100; i++) {{
                 let s = new THREE.Group();
-                let gr = new THREE.Mesh(new THREE.PlaneGeometry(8000, 400), new THREE.MeshPhongMaterial({{color: 0x2d5a27}}));
-                let rd = new THREE.Mesh(new THREE.PlaneGeometry(350, 400), new THREE.MeshPhongMaterial({{color: 0x1a1a1a}}));
-                let ln = new THREE.Mesh(new THREE.PlaneGeometry(12, 150), new THREE.MeshBasicMaterial({{color: 0xFFD700}}));
+                let gr = new THREE.Mesh(new THREE.PlaneGeometry(8000, 450), new THREE.MeshPhongMaterial({{color: 0x2d5a27}}));
+                let rd = new THREE.Mesh(new THREE.PlaneGeometry(400, 450), new THREE.MeshPhongMaterial({{color: 0x1a1a1a}}));
+                let ln = new THREE.Mesh(new THREE.PlaneGeometry(15, 180), new THREE.MeshBasicMaterial({{color: 0xFFD700}}));
                 gr.rotation.x = rd.rotation.x = ln.rotation.x = -Math.PI/2;
                 rd.position.y = 0.1; ln.position.y = 0.2; s.add(gr); s.add(rd); s.add(ln);
 
                 if(i%10==0) {{
-                    let house = new THREE.Mesh(new THREE.BoxGeometry(100, 80, 100), new THREE.MeshPhongMaterial({{color: 0xD21034}}));
-                    let side = (i%20==0)? 650 : -650;
-                    house.position.set(side, 40, 0); s.add(house); s.houseX = side;
+                    let house = new THREE.Mesh(new THREE.BoxGeometry(120, 90, 120), new THREE.MeshPhongMaterial({{color: 0xD21034}}));
+                    let side = (i%20==0)? 750 : -750;
+                    house.position.set(side, 45, 0); s.add(house); s.houseX = side;
                 }}
-                s.position.z = -i * 400; scene.add(s); road.push(s);
+                s.position.z = -i * 450; scene.add(s); road.push(s);
             }}
 
             window.addEventListener('keydown', e => {{ 
                 if(isCrashed) return;
-                if(e.key=='ArrowUp') speed += 0.0022; 
-                if(e.key=='ArrowLeft') targetX -= 7; 
-                if(e.key=='ArrowRight') targetX += 7;
+                if(e.key=='ArrowUp') speed += 0.0025; 
+                if(e.key=='ArrowLeft') targetX -= 8; 
+                if(e.key=='ArrowRight') targetX += 8;
                 if(e.key.toLowerCase()=='n') toggleTime();
             }});
             animate();
@@ -139,33 +136,27 @@ sim_html = f"""
             if(isCrashed) return;
             requestAnimationFrame(animate);
             speed *= 0.996; tx += (targetX - tx) * 0.1;
-            let onRoad = Math.abs(tx) < 175;
             
-            // Timer Logic
-            let elapsed = Math.floor((Date.now() - startTime) / 1000);
-            let m = Math.floor(elapsed / 60).toString().padStart(2, '0');
-            let s = (elapsed % 60).toString().padStart(2, '0');
-            document.getElementById('clock').innerText = m + ":" + s;
-
             road.forEach(seg => {{ 
-                seg.position.z += speed * 8000; 
-                if(seg.position.z > 1500) seg.position.z -= 100 * 400; 
-                if(Math.abs(seg.position.z) < 80 && seg.houseX && Math.abs(tx - seg.houseX) < 150) {{
+                seg.position.z += speed * 9000; 
+                if(seg.position.z > 1500) seg.position.z -= 100 * 450; 
+                if(Math.abs(seg.position.z) < 100 && seg.houseX && Math.abs(tx - seg.houseX) < 180) {{
                     isCrashed = true;
                     document.getElementById('crash-screen').style.display = 'flex';
                     if(osc) osc.stop();
                 }}
             }});
 
-            cabin.position.x = tx; // Truck body stays centered on steering position
+            // Align the Cabin to the truck's steering (tx)
+            cabin.position.x = tx; 
             wheel.rotation.z = (targetX - tx) * -0.2;
             
-            // Camera sits on the LEFT seat (relative to truck center)
-            camera.position.set(tx - 20, 28, 35); 
-            camera.lookAt(tx - 20, 20, -300);
+            // Set Camera to the Driver's eye level, offset left (-25)
+            camera.position.set(tx - 25, 32, 45); 
+            camera.lookAt(tx - 25, 22, -400);
 
-            document.getElementById('sp').innerText = Math.round(speed * 50000);
-            if(osc) osc.frequency.value = 25 + (speed * 15000);
+            document.getElementById('sp').innerText = Math.round(speed * 55000);
+            if(osc) osc.frequency.value = 25 + (speed * 16000);
             renderer.render(scene, camera);
         }}
     </script>
