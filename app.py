@@ -15,7 +15,7 @@ sim_html = f"""
 <head>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
-        body {{ margin: 0; background: #87CEEB; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }}
+        body {{ margin: 0; background: #87CEEB; overflow: hidden; font-family: sans-serif; }}
         #hud {{ 
             position: absolute; top: 20px; left: 20px; 
             background: rgba(0,32,159,0.9); padding: 20px; border-radius: 10px; 
@@ -49,7 +49,7 @@ sim_html = f"""
 
     <script>
         let scene, camera, renderer, truck, wheels = [], roadSegments = [], smokeParticles = [];
-        let speed = 0, targetSpeed = 0, truckX = 0, targetX = 0, time = 0, keys = {{}};
+        let speed = 0, truckX = 0, targetX = 0, time = 0, keys = {{}};
         let audioCtx, osc;
 
         function init() {{
@@ -76,14 +76,12 @@ sim_html = f"""
             sun.position.set(100, 500, 100);
             scene.add(sun);
 
-            // --- THE CURVED WORLD ---
             for(let i=0; i<150; i++) {{
                 let seg = new THREE.Group();
                 let road = new THREE.Mesh(new THREE.PlaneGeometry(130, 40), new THREE.MeshPhongMaterial({{color: 0x111111}}));
                 road.rotation.x = -Math.PI/2;
                 seg.add(road);
 
-                // Racing Borders
                 let curbL = new THREE.Mesh(new THREE.PlaneGeometry(12, 40), new THREE.MeshBasicMaterial({{color: i%2==0 ? 0xD21034 : 0xffffff}}));
                 curbL.rotation.x = -Math.PI/2;
                 curbL.position.set(-71, 0.2, 0);
@@ -93,12 +91,10 @@ sim_html = f"""
                 curbR.position.set(71, 0.2, 0);
                 seg.add(curbR);
 
-                // Passing Mountains & Community Buildings
                 if(i % 12 == 0) {{
                     let mt = new THREE.Mesh(new THREE.ConeGeometry(70, 150, 4), new THREE.MeshPhongMaterial({{color: 0x1b2b1b}}));
                     mt.position.set(i%24==0?300:-300, 75, 0);
                     seg.add(mt);
-                    
                     let bld = new THREE.Mesh(new THREE.BoxGeometry(20, 25, 20), new THREE.MeshPhongMaterial({{color: 0xffffff}}));
                     bld.position.set(i%24==0?-100:100, 12.5, 0);
                     seg.add(bld);
@@ -109,35 +105,28 @@ sim_html = f"""
                 roadSegments.push(seg);
             }}
 
-            // --- THE HEAVY 18-WHEELER (FORWARD FACING) ---
             truck = new THREE.Group();
             let blue = new THREE.MeshPhongMaterial({{color: 0x00209F, shininess: 100}});
-            
-            // Nose & Cab
             let nose = new THREE.Mesh(new THREE.BoxGeometry(3.6, 3.2, 6), blue);
             nose.position.set(0, 1.6, -8); 
             truck.add(nose);
-
             let cab = new THREE.Mesh(new THREE.BoxGeometry(4.3, 5.8, 5.5), blue);
             cab.position.set(0, 2.9, -2.5);
             truck.add(cab);
 
-            // Chrome Stacks (Dual Exhaust)
             let chrome = new THREE.MeshPhongMaterial({{color: 0xdddddd, shininess: 200}});
             let s1 = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 9.5), chrome); 
             s1.position.set(1.9, 5.5, -1.5); 
             let s2 = s1.clone(); s2.position.x = -1.9;
             truck.add(s1); truck.add(s2);
 
-            // Haitian Flag
             let flagHT = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1), new THREE.MeshBasicMaterial({{color: 0xD21034}}));
             flagHT.position.set(2.2, 4.8, -2.5); flagHT.rotation.y = Math.PI/2;
             truck.add(flagHT);
 
-            // 10 Heavy Wheels
             let tireGeo = new THREE.CylinderGeometry(1.4, 1.4, 1.4, 18);
             let tireMat = new THREE.MeshPhongMaterial({{color: 0x050505}});
-            [[-2.2,1.4,-6], [2.2,1.4,-6], [-2.2,1.4,-1], [2.2,1.4,-1], [-2.2,1.4,12], [2.2,1.4,12], [-2.2,1.4,16], [2.2,1.4,16]].forEach(p => {{
+            [[-2.2,1.4,-6], [2.2,1.4,-6], [-2.2,1.4,-1], [2.2,1.4,-1], [-2.1,1.4,12], [2.1,1.4,12], [-2.1,1.4,16], [2.1,1.4,16]].forEach(p => {{
                 let t = new THREE.Mesh(tireGeo, tireMat);
                 t.rotation.z = Math.PI/2;
                 t.position.set(p[0], p[1], p[2]);
@@ -145,7 +134,6 @@ sim_html = f"""
                 wheels.push(t);
             }});
 
-            // White Trailer
             let trailer = new THREE.Mesh(new THREE.BoxGeometry(4.4, 6.8, 36), new THREE.MeshPhongMaterial({{color: 0xffffff}}));
             trailer.position.set(0, 4.5, 16);
             truck.add(trailer);
@@ -161,20 +149,12 @@ sim_html = f"""
             requestAnimationFrame(animate);
             if(!truck) return;
 
-            // --- HEAVY PROGRESSIVE ACCELERATION ---
-            // The truck gains speed based on a "Torque Curve"
-            if (keys['ArrowUp']) {{
-                // Very slow increment (step by step)
-                speed += 0.0003; 
-            }} else {{
-                // Natural deceleration (Inertia)
-                speed *= 0.998; 
-            }}
+            if (keys['ArrowUp']) {{ speed += 0.0003; }} 
+            else {{ speed *= 0.998; }}
             
-            if (keys['ArrowDown']) speed -= 0.0008; // Heavy Brakes
+            if (keys['ArrowDown']) speed -= 0.0008; 
             if (speed < 0) speed = 0;
 
-            // Heavy Rig Steering (Slow Response)
             if (keys['ArrowLeft']) targetX -= 0.9;
             if (keys['ArrowRight']) targetX += 0.9;
             truckX += (targetX - truckX) * 0.05;
@@ -187,7 +167,6 @@ sim_html = f"""
 
             time += speed * 4;
 
-            // Curved World Logic
             roadSegments.forEach((seg, index) => {{
                 seg.position.z += speed * 350; 
                 if(seg.position.z > 200) seg.position.z -= 150 * 40;
@@ -195,7 +174,6 @@ sim_html = f"""
                 seg.position.x = curve;
             }});
 
-            // Healthy Exhaust Smoke (Intensifies when pedaling the gas)
             if(keys['ArrowUp'] && Math.random() > 0.2) {{
                 let sm = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 8), new THREE.MeshBasicMaterial({{color: 0xffffff, transparent: true, opacity: 0.5}}));
                 sm.position.set(truckX + (Math.random()>0.5?1.9:-1.9), 10, -3);
@@ -223,3 +201,6 @@ sim_html = f"""
     </script>
 </body>
 </html>
+"""
+
+components.html(sim_html, height=850)
