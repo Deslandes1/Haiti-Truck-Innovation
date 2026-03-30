@@ -5,7 +5,7 @@ import streamlit.components.v1 as components
 OWNER = "Gesner Deslandes"
 COMPANY = "EduHumanity"
 
-st.set_page_config(page_title="Haiti Truck - Master Center", layout="wide")
+st.set_page_config(page_title="Haiti Truck - Big Steering", layout="wide")
 
 sim_html = f"""
 <!DOCTYPE html>
@@ -24,8 +24,8 @@ sim_html = f"""
 <body>
     <div id="start" onclick="this.style.display='none'; init();">
         <h1 style="color:#D21034;">🇭🇹 {COMPANY}</h1>
-        <p>MASTER CABIN ALIGNMENT | LHD & AUTOMATIC</p>
-        <h2 style="background:#00209F; padding:10px 40px; border-radius:5px;">ENGAGE ENGINE</h2>
+        <p>HEAVY-DUTY STEERING WHEEL | LHD CENTERED</p>
+        <h2 style="background:#00209F; padding:10px 40px; border-radius:5px;">START ENGINE</h2>
     </div>
 
     <div id="crash">
@@ -54,34 +54,35 @@ sim_html = f"""
             scene.background = new THREE.Color(0x87CEEB);
             scene.fog = new THREE.Fog(0x87CEEB, 1, 8000);
             
-            // Wider FOV (80) to see the whole centered cabin
             camera = new THREE.PerspectiveCamera(80, window.innerWidth/window.innerHeight, 0.1, 25000);
             renderer = new THREE.WebGLRenderer({{antialias: true}});
             renderer.setSize(window.innerWidth, window.innerHeight); document.body.appendChild(renderer.domElement);
             
             let amb = new THREE.AmbientLight(0xffffff, 1.0); scene.add(amb); scene.amb = amb;
 
-            // --- THE MASTER CENTERED CABIN ---
             cabin = new THREE.Group();
             let cMat = new THREE.MeshPhongMaterial({{color: 0x151515}});
             
-            // Dashboard - centered at 0
+            // Dashboard (Centered)
             let dash = new THREE.Mesh(new THREE.BoxGeometry(200, 30, 50), cMat);
             dash.position.set(0, 5, -25);
             cabin.add(dash);
 
-            // Left-Hand Steering Wheel (Shifted left to -35)
+            // --- THE BIG STEERING WHEEL ---
             wheel = new THREE.Group();
-            let wR = new THREE.Mesh(new THREE.TorusGeometry(7, 1.4, 12, 40), new THREE.MeshPhongMaterial({{color: 0x000}}));
+            // Increased Radius to 10 and Tube thickness to 1.8
+            let wR = new THREE.Mesh(new THREE.TorusGeometry(10, 1.8, 16, 50), new THREE.MeshPhongMaterial({{color: 0x000}}));
             wheel.add(wR);
             let hM = new THREE.MeshPhongMaterial({{color: 0x5c4033}});
-            let L = new THREE.Mesh(new THREE.BoxGeometry(3, 10, 3), hM); L.position.set(-7, 0, 1);
-            let R = L.clone(); R.position.set(7, 0, 1);
+            // Hands resized to fit the larger wheel
+            let L = new THREE.Mesh(new THREE.BoxGeometry(4, 12, 4), hM); L.position.set(-10, 0, 1);
+            let R = L.clone(); R.position.set(10, 0, 1);
             wheel.add(L); wheel.add(R);
-            wheel.position.set(-35, 20, -35); wheel.rotation.x = 1.4;
+            // Positioned at -35 on the Left seat
+            wheel.position.set(-35, 20, -35); wheel.rotation.x = 1.45;
             cabin.add(wheel);
 
-            // Automatic Transmission Shifter (Shifted right to +15)
+            // Automatic Gear Shifter
             let gear = new THREE.Group();
             let gB = new THREE.Mesh(new THREE.BoxGeometry(12, 8, 20), new THREE.MeshPhongMaterial({{color: 0x080808}}));
             let gS = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 12), new THREE.MeshPhongMaterial({{color: 0x888}}));
@@ -90,7 +91,7 @@ sim_html = f"""
             gear.position.set(15, 12, -35);
             cabin.add(gear);
 
-            // Symmetrical Window Pillars
+            // Frame Pillars
             let pL = new THREE.Mesh(new THREE.BoxGeometry(6, 120, 6), cMat);
             pL.position.set(-85, 50, -20); pL.rotation.z = 0.12;
             cabin.add(pL);
@@ -99,7 +100,7 @@ sim_html = f"""
 
             scene.add(cabin);
 
-            // Infinite Road
+            // Infinite World
             for(let i=0; i<100; i++) {{
                 let s = new THREE.Group();
                 let gr = new THREE.Mesh(new THREE.PlaneGeometry(10000, 500), new THREE.MeshPhongMaterial({{color: 0x2d5a27}}));
@@ -148,11 +149,9 @@ sim_html = f"""
                 }}
             }});
 
-            // The Cabin group moves with the center of the road (tx)
             cabin.position.x = tx; 
             wheel.rotation.z = (targetX - tx) * -0.2;
             
-            // Eyes are behind the Left-Hand steering wheel (-35)
             camera.position.set(tx - 35, 38, 55); 
             camera.lookAt(tx - 35, 25, -500);
 
