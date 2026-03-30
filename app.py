@@ -1,52 +1,41 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.set_page_config(page_title="Haiti Truck - Iron Cabin", layout="wide")
+st.set_page_config(page_title="GlobalInternet.py - Heavy-Duty Simulation", layout="wide")
 
-game_html = """
+sim_html = """
 <!DOCTYPE html>
 <html>
 <head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
-        body {
-            margin: 0;
-            background: #0a0a0a;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            font-family: 'Courier New', monospace;
-        }
-        canvas {
-            border: 3px solid #D21034;
-            box-shadow: 0 0 20px rgba(210,16,52,0.3);
-        }
+        body { margin: 0; overflow: hidden; font-family: 'Courier New', monospace; }
         #info {
             position: absolute;
-            top: 10px;
-            left: 10px;
+            top: 20px;
+            left: 20px;
             color: #00ff41;
             background: rgba(0,0,0,0.7);
-            padding: 8px 15px;
-            border-radius: 5px;
-            font-family: monospace;
-            z-index: 10;
+            padding: 12px;
+            border-radius: 8px;
+            z-index: 100;
+            pointer-events: none;
+            font-size: 14px;
         }
         #controls {
             position: absolute;
-            bottom: 10px;
-            left: 10px;
+            bottom: 20px;
+            left: 20px;
             color: #00ff41;
             background: rgba(0,0,0,0.7);
-            padding: 8px 15px;
-            border-radius: 5px;
+            padding: 12px;
+            border-radius: 8px;
+            z-index: 100;
             font-family: monospace;
-            z-index: 10;
+            font-size: 12px;
         }
         #startScreen {
             position: absolute;
-            top: 0;
-            left: 0;
             width: 100%;
             height: 100%;
             background: rgba(0,0,0,0.9);
@@ -55,13 +44,11 @@ game_html = """
             align-items: center;
             flex-direction: column;
             color: white;
-            z-index: 20;
+            z-index: 200;
             cursor: pointer;
+            font-family: sans-serif;
         }
-        .flag {
-            font-size: 4rem;
-            margin-bottom: 1rem;
-        }
+        .flag { font-size: 4rem; margin-bottom: 1rem; }
         button {
             background: #00209F;
             color: white;
@@ -73,328 +60,381 @@ game_html = """
             margin-top: 20px;
             transition: 0.2s;
         }
-        button:hover {
-            background: #D21034;
-            transform: scale(1.05);
+        button:hover { background: #D21034; transform: scale(1.05); }
+        #resources {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: #ffcc44;
+            background: rgba(0,0,0,0.7);
+            padding: 12px;
+            border-radius: 8px;
+            z-index: 100;
+            font-family: monospace;
+            text-align: right;
         }
     </style>
 </head>
 <body>
     <div id="startScreen">
         <div class="flag">🇭🇹</div>
-        <h1 style="color:#D21034;">EduHumanity</h1>
-        <p>IRON-CLAD CABIN LOCK | EXPRESSIVE SIGNS</p>
+        <h1 style="color:#D21034;">GlobalInternet.py</h1>
+        <p>HEAVY-DUTY SIMULATION ENGINE | IRON-CLAD CABIN</p>
         <button id="startBtn">START ENGINE</button>
     </div>
-    <canvas id="gameCanvas" width="900" height="650"></canvas>
     <div id="info">
         🚛 DRIVER: Gesner Deslandes<br>
-        📊 SPEED: <span id="speed">0</span> km/h &nbsp;|&nbsp;
-        🎯 SCORE: <span id="score">0</span>
+        SPEED: <span id="speed">0</span> km/h &nbsp;|&nbsp;
+        GEAR: D
+    </div>
+    <div id="resources">
+        💎 RESOURCES COLLECTED: <span id="score">0</span>
     </div>
     <div id="controls">
-        ← → Steer | ↑ Accelerate | ↓ Brake
+        ↑ Accelerate &nbsp;&nbsp; ↓ Brake &nbsp;&nbsp; ← → Steer
     </div>
 
     <script>
         // ========================
-        // 2D Driving Simulator (Cabin View)
+        // 3D Driving Simulator (Cabin View) with Resource Collection
         // ========================
 
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        const startScreen = document.getElementById('startScreen');
-        const startBtn = document.getElementById('startBtn');
-
-        // Game state
-        let gameRunning = false;
-        let speed = 0;
-        let baseSpeed = 0;
+        let scene, camera, renderer, cabin, wheel, roadGroup, roadSegments = [];
+        let speed = 0, targetSpeed = 0, roadX = 0, targetRoadX = 0;
         let score = 0;
-        let truckX = canvas.width / 2;
-        const truckWidth = 70;
-        const truckHeight = 100;
-        const laneWidth = 400;
-        const laneLeft = (canvas.width - laneWidth) / 2;
-        const laneRight = laneLeft + laneWidth;
-
-        // Obstacles
-        let obstacles = [];
-        let obstacleSpawnTimer = 0;
+        let resources = [];      // resources placed on the road
+        let resourceSpawnTimer = 0;
+        let gameRunning = false;
+        let animId = null;
 
         // Controls
-        let leftPressed = false;
-        let rightPressed = false;
-        let accelPressed = false;
-        let brakePressed = false;
+        let leftPressed = false, rightPressed = false, accelPressed = false, brakePressed = false;
 
-        // Dashboard animation
-        let steeringAngle = 0;
-        let speedometerNeedle = 0;
+        // Constants
+        const ROAD_WIDTH = 800;
+        const GRASS_WIDTH = 25000;
+        const SEGMENT_LENGTH = 1200;
+        const NUM_SEGMENTS = 100;
+        const MAX_SPEED = 45;
+        const STEER_SPEED = 0.12;
+        const ACCEL_RATE = 0.025;
+        const BRAKE_RATE = 0.04;
 
-        // Start game
-        startBtn.onclick = () => {
-            startScreen.style.display = 'none';
-            startGame();
-        };
+        // Helper: random range
+        function randomRange(min, max) { return min + Math.random() * (max - min); }
 
-        function startGame() {
-            gameRunning = true;
-            speed = 0;
-            baseSpeed = 0;
-            score = 0;
-            obstacles = [];
-            obstacleSpawnTimer = 0;
-            truckX = canvas.width / 2;
-            updateUI();
-            requestAnimationFrame(gameLoop);
+        // Create a resource (a glowing gold cube)
+        function createResource(x, z) {
+            const group = new THREE.Group();
+            const geometry = new THREE.BoxGeometry(40, 40, 40);
+            const material = new THREE.MeshPhongMaterial({ color: 0xffaa33, emissive: 0x442200 });
+            const cube = new THREE.Mesh(geometry, material);
+            group.add(cube);
+            // Add a small glow effect using a point light? Not necessary.
+            group.position.set(x, 20, z);
+            return group;
         }
 
-        function updateUI() {
-            document.getElementById('speed').innerText = Math.floor(speed);
-            document.getElementById('score').innerText = score;
+        // Add resource to the road segment
+        function addResourceToSegment(segment, zOffset) {
+            const x = randomRange(-ROAD_WIDTH/2 + 100, ROAD_WIDTH/2 - 100);
+            const resource = createResource(x, zOffset);
+            segment.add(resource);
+            resources.push({ obj: resource, x: x, z: zOffset });
         }
 
-        function spawnObstacle() {
-            const width = 50 + Math.random() * 40;
-            const height = 50;
-            const x = laneLeft + Math.random() * (laneWidth - width);
-            obstacles.push({
-                x: x,
-                y: -height,
-                width: width,
-                height: height,
-                type: Math.random() > 0.7 ? 'rock' : 'barrel'
+        function init() {
+            // --- 3D Setup ---
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a2f3f);
+            scene.fog = new THREE.Fog(0x0a2f3f, 500, 20000);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 30000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0x404040);
+            scene.add(ambientLight);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+            dirLight.position.set(100, 300, 100);
+            scene.add(dirLight);
+            const backLight = new THREE.DirectionalLight(0x88aaff, 0.5);
+            backLight.position.set(-50, 150, -200);
+            scene.add(backLight);
+
+            // --- CABIN (driver's view) ---
+            cabin = new THREE.Group();
+            const darkMat = new THREE.MeshPhongMaterial({ color: 0x222222 });
+            const redMat = new THREE.MeshPhongMaterial({ color: 0xD21034 });
+            const blueMat = new THREE.MeshPhongMaterial({ color: 0x00209F });
+
+            // Dashboard
+            const dash = new THREE.Mesh(new THREE.BoxGeometry(400, 50, 100), darkMat);
+            dash.position.set(0, -35, -80);
+            cabin.add(dash);
+
+            // Steering wheel
+            wheel = new THREE.Group();
+            const wheelRing = new THREE.Mesh(new THREE.TorusGeometry(22, 4, 32, 80), new THREE.MeshPhongMaterial({ color: 0x111111, roughness: 0.5 }));
+            wheel.add(wheelRing);
+            // Spokes
+            for (let i = 0; i < 3; i++) {
+                const spoke = new THREE.Mesh(new THREE.BoxGeometry(40, 5, 5), new THREE.MeshPhongMaterial({ color: 0x888888 }));
+                spoke.rotation.z = (i * Math.PI * 2 / 3);
+                wheel.add(spoke);
+            }
+            // Center cap
+            const cap = new THREE.Mesh(new THREE.SphereGeometry(6, 16, 16), new THREE.MeshPhongMaterial({ color: 0xCCCCCC }));
+            wheel.add(cap);
+            wheel.position.set(-60, 20, -100);
+            wheel.rotation.x = 1.55;
+            cabin.add(wheel);
+
+            // Dashboard instruments
+            const speedo = new THREE.Mesh(new THREE.BoxGeometry(50, 40, 10), new THREE.MeshPhongMaterial({ color: 0x111111 }));
+            speedo.position.set(30, -20, -85);
+            cabin.add(speedo);
+            const tacho = new THREE.Mesh(new THREE.BoxGeometry(50, 40, 10), new THREE.MeshPhongMaterial({ color: 0x111111 }));
+            tacho.position.set(-30, -20, -85);
+            cabin.add(tacho);
+
+            // Pillars
+            const leftPillar = new THREE.Mesh(new THREE.BoxGeometry(15, 280, 15), darkMat);
+            leftPillar.position.set(-200, 80, -60);
+            leftPillar.rotation.z = 0.04;
+            cabin.add(leftPillar);
+            const rightPillar = leftPillar.clone();
+            rightPillar.position.x = 200;
+            rightPillar.rotation.z = -0.04;
+            cabin.add(rightPillar);
+
+            // Steering column
+            const column = new THREE.Mesh(new THREE.CylinderGeometry(10, 12, 40, 8), darkMat);
+            column.position.set(-60, -5, -105);
+            column.rotation.x = 0.2;
+            cabin.add(column);
+
+            scene.add(cabin);
+
+            // --- ROAD (moving world) ---
+            roadGroup = new THREE.Group();
+            scene.add(roadGroup);
+
+            for (let i = 0; i < NUM_SEGMENTS; i++) {
+                const segment = new THREE.Group();
+
+                // Grass
+                const grass = new THREE.Mesh(new THREE.PlaneGeometry(GRASS_WIDTH, SEGMENT_LENGTH), new THREE.MeshPhongMaterial({ color: 0x3c9e3c }));
+                grass.rotation.x = -Math.PI / 2;
+                segment.add(grass);
+
+                // Road
+                const roadMat = new THREE.MeshPhongMaterial({ color: 0x2c2c2c });
+                const road = new THREE.Mesh(new THREE.PlaneGeometry(ROAD_WIDTH, SEGMENT_LENGTH), roadMat);
+                road.rotation.x = -Math.PI / 2;
+                segment.add(road);
+
+                // Road markings (dashed line)
+                const dashMat = new THREE.MeshPhongMaterial({ color: 0xffdd88 });
+                for (let j = -SEGMENT_LENGTH/2 + 100; j < SEGMENT_LENGTH/2; j += 200) {
+                    const mark = new THREE.Mesh(new THREE.BoxGeometry(20, 20, 30), dashMat);
+                    mark.position.set(0, 5, j);
+                    road.add(mark);
+                }
+
+                // Trees and signs
+                if (i % 8 === 0) {
+                    const side = (i % 16 === 0) ? 1400 : -1400;
+                    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(30, 40, 100, 6), new THREE.MeshPhongMaterial({ color: 0x8B5A2B }));
+                    trunk.position.set(side, 50, 0);
+                    segment.add(trunk);
+                    const top = new THREE.Mesh(new THREE.ConeGeometry(50, 120, 8), new THREE.MeshPhongMaterial({ color: 0x2c8c2c }));
+                    top.position.set(side, 110, 0);
+                    segment.add(top);
+                }
+
+                // Add a restaurant sign every 20 segments
+                if (i % 20 === 0 && i !== 0) {
+                    const signBase = new THREE.Mesh(new THREE.BoxGeometry(80, 200, 20), new THREE.MeshPhongMaterial({ color: 0xD21034 }));
+                    signBase.position.set(1200, 100, 0);
+                    segment.add(signBase);
+                    const textCanvas = document.createElement('canvas');
+                    textCanvas.width = 256;
+                    textCanvas.height = 128;
+                    const ctx2 = textCanvas.getContext('2d');
+                    ctx2.fillStyle = '#FFFFFF';
+                    ctx2.fillRect(0, 0, textCanvas.width, textCanvas.height);
+                    ctx2.fillStyle = '#D21034';
+                    ctx2.font = 'Bold 30px Arial';
+                    ctx2.fillText("RESTAURANT", 20, 60);
+                    const texture = new THREE.CanvasTexture(textCanvas);
+                    const signBoard = new THREE.Mesh(new THREE.BoxGeometry(150, 80, 5), new THREE.MeshPhongMaterial({ map: texture }));
+                    signBoard.position.set(1200, 180, 5);
+                    segment.add(signBoard);
+                }
+
+                segment.position.z = -i * SEGMENT_LENGTH;
+                roadGroup.add(segment);
+                roadSegments.push(segment);
+            }
+
+            // Spawn initial resources
+            for (let i = 0; i < 10; i++) {
+                const segIndex = Math.floor(Math.random() * NUM_SEGMENTS);
+                const segment = roadSegments[segIndex];
+                const zOffset = randomRange(-SEGMENT_LENGTH/2 + 100, SEGMENT_LENGTH/2 - 100);
+                addResourceToSegment(segment, zOffset);
+            }
+
+            // --- Controls ---
+            window.addEventListener('keydown', (e) => {
+                if (!gameRunning) return;
+                if (e.key === 'ArrowUp') accelPressed = true;
+                if (e.key === 'ArrowDown') brakePressed = true;
+                if (e.key === 'ArrowLeft') leftPressed = true;
+                if (e.key === 'ArrowRight') rightPressed = true;
             });
+            window.addEventListener('keyup', (e) => {
+                if (e.key === 'ArrowUp') accelPressed = false;
+                if (e.key === 'ArrowDown') brakePressed = false;
+                if (e.key === 'ArrowLeft') leftPressed = false;
+                if (e.key === 'ArrowRight') rightPressed = false;
+            });
+
+            // Start animation
+            animate();
         }
 
         function update() {
             if (!gameRunning) return;
 
             // Acceleration & braking
-            if (accelPressed) {
-                baseSpeed = Math.min(baseSpeed + 0.2, 25);
-            }
-            if (brakePressed) {
-                baseSpeed = Math.max(baseSpeed - 0.3, 0);
-            }
-            // Natural deceleration when no input
-            if (!accelPressed && !brakePressed) {
-                baseSpeed *= 0.98;
-            }
-            speed = baseSpeed;
+            if (accelPressed) targetSpeed = Math.min(targetSpeed + ACCEL_RATE, MAX_SPEED);
+            else if (brakePressed) targetSpeed = Math.max(targetSpeed - BRAKE_RATE, 0);
+            else targetSpeed *= 0.995;
+
+            speed = targetSpeed;
 
             // Steering
-            let steerSpeed = 6;
-            if (leftPressed && truckX > laneLeft + 10) truckX -= steerSpeed;
-            if (rightPressed && truckX < laneRight - truckWidth - 10) truckX += steerSpeed;
+            let steer = 0;
+            if (leftPressed) steer = -STEER_SPEED;
+            if (rightPressed) steer = STEER_SPEED;
+            targetRoadX += steer * speed * 0.2;
+            targetRoadX = Math.max(Math.min(targetRoadX, 450), -450);
+            roadX += (targetRoadX - roadX) * 0.08;
 
-            // Update obstacles
-            for (let i = 0; i < obstacles.length; i++) {
-                obstacles[i].y += speed * 0.5;
-                // Collision detection (truck hitbox)
-                if (obstacles[i].y + obstacles[i].height > canvas.height - 150 &&
-                    obstacles[i].y < canvas.height - 100 &&
-                    obstacles[i].x < truckX + truckWidth &&
-                    obstacles[i].x + obstacles[i].width > truckX) {
-                    gameRunning = false;
-                    startScreen.style.display = 'flex';
-                    startScreen.querySelector('h1').innerHTML = '💥 CRASH!';
-                    return;
-                }
-            }
-            // Remove off-screen obstacles
-            obstacles = obstacles.filter(obs => obs.y < canvas.height);
-
-            // Spawn new obstacles
-            if (speed > 5) {
-                obstacleSpawnTimer++;
-                let spawnDelay = Math.max(30, 80 - Math.floor(speed));
-                if (obstacleSpawnTimer > spawnDelay) {
-                    obstacleSpawnTimer = 0;
-                    spawnObstacle();
+            // Move road segments
+            const move = speed * 0.6;
+            for (let seg of roadSegments) {
+                seg.position.z += move;
+                if (seg.position.z > 3000) {
+                    seg.position.z -= NUM_SEGMENTS * SEGMENT_LENGTH;
+                    // Move resources that belong to this segment? They are attached to the segment, so they move with it.
+                    // No need to update manually.
                 }
             }
 
-            // Score increases with speed
-            score += Math.floor(speed * 0.5);
-            updateUI();
+            // Steer the world
+            roadGroup.position.x = roadX;
 
-            // Animate dashboard
-            steeringAngle = (leftPressed ? -0.3 : (rightPressed ? 0.3 : 0)) * 0.8;
-            speedometerNeedle = speed / 30;
-        }
+            // Steering wheel rotation
+            if (wheel) wheel.rotation.z = -roadX * 0.004;
 
-        function drawDashboard() {
-            // Dashboard background
-            ctx.fillStyle = '#1a1a1a';
-            ctx.fillRect(0, canvas.height - 120, canvas.width, 120);
-            ctx.fillStyle = '#333';
-            ctx.fillRect(10, canvas.height - 110, canvas.width - 20, 100);
-            
-            // Speedometer (circular)
-            const speedX = 100, speedY = canvas.height - 60;
-            ctx.beginPath();
-            ctx.arc(speedX, speedY, 35, 0, Math.PI * 2);
-            ctx.fillStyle = '#111';
-            ctx.fill();
-            ctx.strokeStyle = '#00ff41';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            // Needle
-            const angle = -Math.PI/2 + (speedometerNeedle * Math.PI);
-            const needleX = speedX + Math.cos(angle) * 25;
-            const needleY = speedY + Math.sin(angle) * 25;
-            ctx.beginPath();
-            ctx.moveTo(speedX, speedY);
-            ctx.lineTo(needleX, needleY);
-            ctx.strokeStyle = '#ff4444';
-            ctx.lineWidth = 3;
-            ctx.stroke();
-            ctx.fillStyle = '#00ff41';
-            ctx.font = 'bold 16px monospace';
-            ctx.fillText(Math.floor(speed), speedX-12, speedY-10);
-            ctx.fillStyle = '#aaa';
-            ctx.font = '10px monospace';
-            ctx.fillText('km/h', speedX-8, speedY+15);
+            // Camera (driver's view)
+            camera.position.set(-60, 80, 150);
+            camera.lookAt(-60, 50, -500);
 
-            // Steering wheel
-            const wheelX = canvas.width - 80, wheelY = canvas.height - 60;
-            ctx.beginPath();
-            ctx.arc(wheelX, wheelY, 30, 0, Math.PI * 2);
-            ctx.fillStyle = '#222';
-            ctx.fill();
-            ctx.strokeStyle = '#aaa';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            ctx.save();
-            ctx.translate(wheelX, wheelY);
-            ctx.rotate(steeringAngle);
-            ctx.beginPath();
-            ctx.moveTo(-20, 0);
-            ctx.lineTo(20, 0);
-            ctx.moveTo(0, -20);
-            ctx.lineTo(0, 20);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.arc(0, 0, 12, 0, Math.PI*2);
-            ctx.stroke();
-            ctx.restore();
+            // Cabin follows camera (so it stays in view)
+            cabin.position.copy(camera.position);
+            cabin.rotation.copy(camera.rotation);
+            cabin.translateZ(-180);
+            cabin.translateY(-60);
 
-            // Info text
-            ctx.fillStyle = '#00ff41';
-            ctx.font = '12px monospace';
-            ctx.fillText('DRIVER: Gesner Deslandes', canvas.width-220, canvas.height-100);
-            ctx.fillStyle = '#D21034';
-            ctx.fillText('IRON-CLAD CABIN', canvas.width-180, canvas.height-75);
-        }
-
-        function drawRoad() {
-            // Sky
-            ctx.fillStyle = '#0a2f3f';
-            ctx.fillRect(0, 0, canvas.width, canvas.height - 120);
-            // Road (perspective)
-            const roadTopWidth = 200;
-            const roadBottomWidth = laneWidth;
-            const roadTopY = 100;
-            const roadBottomY = canvas.height - 120;
-            ctx.beginPath();
-            ctx.moveTo((canvas.width-roadTopWidth)/2, roadTopY);
-            ctx.lineTo((canvas.width+roadTopWidth)/2, roadTopY);
-            ctx.lineTo((canvas.width+roadBottomWidth)/2, roadBottomY);
-            ctx.lineTo((canvas.width-roadBottomWidth)/2, roadBottomY);
-            ctx.fillStyle = '#2c2c2c';
-            ctx.fill();
-            ctx.strokeStyle = '#ffff00';
-            ctx.beginPath();
-            ctx.moveTo(canvas.width/2, roadTopY);
-            ctx.lineTo(canvas.width/2, roadBottomY);
-            ctx.stroke();
-            // Lane markings (dashed)
-            for (let i = roadTopY+30; i < roadBottomY; i+=40) {
-                ctx.fillStyle = '#ffff00';
-                ctx.fillRect(canvas.width/2 - 5, i, 10, 20);
-            }
-        }
-
-        function drawTruck() {
-            const truckY = canvas.height - 150;
-            // Cabin
-            ctx.fillStyle = '#D21034';
-            ctx.fillRect(truckX, truckY, truckWidth, truckHeight);
-            // Windows
-            ctx.fillStyle = '#87CEEB';
-            ctx.fillRect(truckX+10, truckY+10, truckWidth-20, 30);
-            ctx.fillStyle = '#00209F';
-            ctx.fillRect(truckX+5, truckY+50, truckWidth-10, 15);
-            // Wheels
-            ctx.fillStyle = '#111';
-            ctx.beginPath();
-            ctx.arc(truckX+10, truckY+truckHeight-10, 12, 0, Math.PI*2);
-            ctx.arc(truckX+truckWidth-10, truckY+truckHeight-10, 12, 0, Math.PI*2);
-            ctx.fill();
-            ctx.fillStyle = '#888';
-            ctx.beginPath();
-            ctx.arc(truckX+10, truckY+truckHeight-10, 6, 0, Math.PI*2);
-            ctx.arc(truckX+truckWidth-10, truckY+truckHeight-10, 6, 0, Math.PI*2);
-            ctx.fill();
-        }
-
-        function drawObstacles() {
-            for (let obs of obstacles) {
-                if (obs.type === 'rock') {
-                    ctx.fillStyle = '#8B5A2B';
-                    ctx.beginPath();
-                    ctx.ellipse(obs.x+obs.width/2, obs.y+obs.height/2, obs.width/2, obs.height/2, 0, 0, Math.PI*2);
-                    ctx.fill();
-                } else {
-                    ctx.fillStyle = '#A0522D';
-                    ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
-                    ctx.fillStyle = '#CD853F';
-                    for (let i=0; i<3; i++) {
-                        ctx.fillRect(obs.x+5, obs.y+5+i*15, obs.width-10, 5);
-                    }
+            // Resource collection detection (simple distance check)
+            // Since resources are in the world, we need to check the distance from the truck position.
+            // The truck position is basically at camera position with some offset? Actually, the truck's location in world coordinates is (0,0,0)? 
+            // Better: we define the truck's world position as (roadX, 0, something). But with moving world, it's simpler to check relative to camera.
+            // For simplicity, we'll check distance from the camera's forward direction.
+            // We'll iterate resources and see if they are within a certain area in front of the camera.
+            const truckWorldPos = new THREE.Vector3(0, 0, 0); // not used
+            // Since resources are children of roadSegments, their world position changes. We'll compute their world position and check if within collision box of truck.
+            for (let i = 0; i < resources.length; i++) {
+                const res = resources[i];
+                const worldPos = res.obj.getWorldPosition(new THREE.Vector3());
+                // The truck's approximate collision area is around (0, 0, -400 to -100) in world coordinates? Let's approximate.
+                // The camera is at (-60, 80, 150) but the truck is in front of camera? Better to set a fixed collision zone.
+                // Since the road moves relative to the truck, the truck's world position is effectively fixed? Actually, the world moves, so the truck's position in world coordinates is the negative of roadGroup.position. Let's compute truck world x = -roadX, truck world z = (some offset). We'll keep it simple: we assume the truck is at (0,0,0) in world space? No.
+                // Instead, we'll check if the resource is within a bounding box in front of the camera.
+                // The camera's forward vector is (0,0,-1) in camera local space. In world space, it's the direction camera is looking.
+                // But this is getting complex. For a simpler approach, we'll check if the resource is within a certain distance from the road center at the truck's z position.
+                // The truck's z position in world coordinates is not constant, but we can approximate using the road segment's z offset.
+                // Since the road moves, the truck's world Z is actually the negative of the road's Z? Let's not overcomplicate: we'll use a simple distance check from the camera's position.
+                const dx = worldPos.x;
+                const dz = worldPos.z - camera.position.z;
+                if (Math.abs(dx) < 100 && dz > -200 && dz < 50) {
+                    // Collect resource
+                    res.obj.parent.remove(res.obj);
+                    resources.splice(i,1);
+                    score++;
+                    document.getElementById('score').innerText = score;
+                    // Spawn a new resource somewhere else
+                    const segIndex = Math.floor(Math.random() * NUM_SEGMENTS);
+                    const segment = roadSegments[segIndex];
+                    const zOffset = randomRange(-SEGMENT_LENGTH/2 + 100, SEGMENT_LENGTH/2 - 100);
+                    addResourceToSegment(segment, zOffset);
+                    i--; // adjust index
                 }
             }
+
+            // Update UI
+            document.getElementById('speed').innerText = Math.floor(speed * 3.6); // convert to km/h
         }
 
-        function gameLoop() {
-            if (!gameRunning) {
-                // Draw a static scene
-                drawRoad();
-                drawTruck();
-                drawDashboard();
-                return;
+        function startGame() {
+            gameRunning = true;
+            targetSpeed = 0;
+            speed = 0;
+            score = 0;
+            document.getElementById('score').innerText = "0";
+            // Reset resources (clear all)
+            for (let r of resources) {
+                r.obj.parent.remove(r.obj);
             }
-            update();
-            drawRoad();
-            drawObstacles();
-            drawTruck();
-            drawDashboard();
-            requestAnimationFrame(gameLoop);
+            resources = [];
+            // Spawn fresh resources
+            for (let i = 0; i < 10; i++) {
+                const segIndex = Math.floor(Math.random() * NUM_SEGMENTS);
+                const segment = roadSegments[segIndex];
+                const zOffset = randomRange(-SEGMENT_LENGTH/2 + 100, SEGMENT_LENGTH/2 - 100);
+                addResourceToSegment(segment, zOffset);
+            }
+            targetRoadX = 0;
+            roadX = 0;
+            leftPressed = false; rightPressed = false; accelPressed = false; brakePressed = false;
         }
 
-        // Keyboard controls
-        window.addEventListener('keydown', (e) => {
-            if (e.key === 'ArrowLeft') leftPressed = true;
-            if (e.key === 'ArrowRight') rightPressed = true;
-            if (e.key === 'ArrowUp') accelPressed = true;
-            if (e.key === 'ArrowDown') brakePressed = true;
-        });
-        window.addEventListener('keyup', (e) => {
-            if (e.key === 'ArrowLeft') leftPressed = false;
-            if (e.key === 'ArrowRight') rightPressed = false;
-            if (e.key === 'ArrowUp') accelPressed = false;
-            if (e.key === 'ArrowDown') brakePressed = false;
-        });
+        function animate() {
+            requestAnimationFrame(animate);
+            if (gameRunning) {
+                update();
+            }
+            renderer.render(scene, camera);
+        }
 
-        // Initial draw
-        drawRoad();
-        drawTruck();
-        drawDashboard();
+        // Start after start screen
+        const startBtn = document.getElementById('startBtn');
+        const startScreen = document.getElementById('startScreen');
+        startBtn.onclick = () => {
+            startScreen.style.display = 'none';
+            init();
+            startGame();
+        };
+        // Initial static scene (optional)
     </script>
 </body>
 </html>
 """
 
-components.html(game_html, height=700)
+components.html(sim_html, height=700)
