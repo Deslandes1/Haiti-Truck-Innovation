@@ -3,216 +3,256 @@ import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Haiti Truck - Iron Cabin", layout="wide")
 
-sim_html = """
+game_html = """
 <!DOCTYPE html>
 <html>
 <head>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; font-family: monospace; }
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: monospace;
+        }
+        canvas {
+            border: 2px solid #D21034;
+            background: #1a2a1a;
+        }
         #info {
             position: absolute;
-            top: 20px;
-            left: 20px;
+            top: 10px;
+            left: 10px;
             color: white;
             background: rgba(0,0,0,0.7);
-            padding: 12px;
-            border-radius: 8px;
-            z-index: 100;
-            pointer-events: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            z-index: 10;
         }
         #controls {
             position: absolute;
-            bottom: 20px;
-            left: 20px;
+            bottom: 10px;
+            left: 10px;
             color: white;
             background: rgba(0,0,0,0.7);
-            padding: 12px;
-            border-radius: 8px;
-            z-index: 100;
-            font-family: monospace;
+            padding: 8px 15px;
+            border-radius: 5px;
+            z-index: 10;
         }
-        #start {
+        #startScreen {
             position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
-            background: #000;
-            color: white;
+            background: rgba(0,0,0,0.9);
             display: flex;
-            flex-direction: column;
             justify-content: center;
             align-items: center;
-            z-index: 200;
+            flex-direction: column;
+            color: white;
+            z-index: 20;
             cursor: pointer;
-            font-family: sans-serif;
         }
     </style>
 </head>
 <body>
-    <div id="start" onclick="this.style.display='none'; startGame();">
+    <div id="startScreen">
         <h1 style="color:#D21034;">🇭🇹 EduHumanity</h1>
         <p>IRON-CLAD CABIN LOCK | EXPRESSIVE SIGNS</p>
-        <h2 style="background:#00209F; padding:10px 40px; border-radius:5px;">START ENGINE</h2>
+        <button style="background:#00209F; color:white; padding:10px 30px; border:none; border-radius:5px; font-size:1.2rem; cursor:pointer;">START ENGINE</button>
     </div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
     <div id="info">
-        <b>DRIVER: Gesner Deslandes</b><br>
-        Speed: <span id="speed">0</span> mph
+        <span>DRIVER: Gesner Deslandes</span><br>
+        Speed: <span id="speed">0</span> mph &nbsp;|&nbsp;
+        Score: <span id="score">0</span>
     </div>
     <div id="controls">
-        ↑ Accelerate<br>
-        ← → Steer
+        ← → Steer | ↑ Accelerate
     </div>
 
     <script>
-        let scene, camera, renderer, cabin, wheel, roadGroup, roadSegments = [];
-        let speed = 0, roadX = 0, targetRoadX = 0;
-        let animId = null;
+        // Get canvas and context
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Game variables
+        let gameRunning = false;
+        let speed = 0;
+        let score = 0;
+        let truckX = canvas.width/2;
+        const truckWidth = 50;
+        const truckHeight = 80;
+        const roadWidth = 300;
+        const roadLeft = (canvas.width - roadWidth)/2;
+        const roadRight = roadLeft + roadWidth;
+
+        // Obstacles
+        let obstacles = [];
+        let obstacleSpawnCounter = 0;
+
+        // Controls
+        let leftPressed = false;
+        let rightPressed = false;
+        let acceleratePressed = false;
+
+        // Acceleration physics
+        let acceleration = 0;
+
+        // Start screen
+        const startScreen = document.getElementById('startScreen');
+        startScreen.querySelector('button').onclick = () => {
+            startScreen.style.display = 'none';
+            startGame();
+        };
 
         function startGame() {
-            // --- 3D Setup ---
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x87CEEB);
-            scene.fog = new THREE.Fog(0x87CEEB, 500, 15000);
+            gameRunning = true;
+            speed = 5;
+            score = 0;
+            obstacles = [];
+            obstacleSpawnCounter = 0;
+            acceleration = 0;
+            truckX = canvas.width/2;
+            updateUI();
+            gameLoop();
+        }
 
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 20000);
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            document.body.appendChild(renderer.domElement);
+        function updateUI() {
+            document.getElementById('speed').innerText = Math.floor(speed * 10);
+            document.getElementById('score').innerText = score;
+        }
 
-            // Lights
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-            scene.add(ambientLight);
-            const dirLight = new THREE.DirectionalLight(0xffffff, 1);
-            dirLight.position.set(100, 200, 100);
-            scene.add(dirLight);
+        function spawnObstacle() {
+            const obstacleWidth = 40 + Math.random() * 30;
+            const obstacleHeight = 50;
+            const x = roadLeft + Math.random() * (roadWidth - obstacleWidth);
+            obstacles.push({
+                x: x,
+                y: -obstacleHeight,
+                width: obstacleWidth,
+                height: obstacleHeight
+            });
+        }
 
-            // --- CABIN (driver's view) ---
-            cabin = new THREE.Group();
-            const darkMat = new THREE.MeshPhongMaterial({ color: 0x222222 });
+        function update() {
+            if (!gameRunning) return;
 
-            // Dashboard
-            const dash = new THREE.Mesh(new THREE.BoxGeometry(400, 50, 100), darkMat);
-            dash.position.set(0, -35, -80);
-            cabin.add(dash);
-
-            // Steering wheel
-            wheel = new THREE.Group();
-            const wheelRing = new THREE.Mesh(new THREE.TorusGeometry(18, 3.5, 32, 64), new THREE.MeshPhongMaterial({ color: 0x111111 }));
-            wheel.add(wheelRing);
-            // Spokes
-            for (let i = 0; i < 3; i++) {
-                const spoke = new THREE.Mesh(new THREE.BoxGeometry(25, 3, 3), new THREE.MeshPhongMaterial({ color: 0x888888 }));
-                spoke.rotation.z = (i * Math.PI * 2 / 3);
-                wheel.add(spoke);
+            // Accelerate / decelerate
+            if (acceleratePressed) {
+                acceleration += 0.2;
+                if (acceleration > 2) acceleration = 2;
+            } else {
+                acceleration -= 0.1;
+                if (acceleration < 0) acceleration = 0;
             }
-            wheel.position.set(-60, 20, -100);
-            wheel.rotation.x = 1.55;
-            cabin.add(wheel);
+            speed = 5 + acceleration * 5;
+            if (speed > 20) speed = 20;
 
-            // Pillars
-            const leftPillar = new THREE.Mesh(new THREE.BoxGeometry(10, 250, 10), darkMat);
-            leftPillar.position.set(-180, 80, -60);
-            leftPillar.rotation.z = 0.04;
-            cabin.add(leftPillar);
-            const rightPillar = leftPillar.clone();
-            rightPillar.position.x = 180;
-            rightPillar.rotation.z = -0.04;
-            cabin.add(rightPillar);
+            // Steering
+            if (leftPressed && truckX > roadLeft + 10) truckX -= 8;
+            if (rightPressed && truckX < roadRight - truckWidth - 10) truckX += 8;
 
-            scene.add(cabin);
-
-            // --- MOVING WORLD ---
-            roadGroup = new THREE.Group();
-            scene.add(roadGroup);
-
-            const segmentLength = 1200;
-            const numSegments = 100;
-            const roadWidth = 800;
-            const grassWidth = 25000;
-
-            for (let i = 0; i < numSegments; i++) {
-                const segment = new THREE.Group();
-
-                // Grass
-                const grass = new THREE.Mesh(new THREE.PlaneGeometry(grassWidth, segmentLength), new THREE.MeshPhongMaterial({ color: 0x3c9e3c }));
-                grass.rotation.x = -Math.PI / 2;
-                segment.add(grass);
-
-                // Road
-                const road = new THREE.Mesh(new THREE.PlaneGeometry(roadWidth, segmentLength), new THREE.MeshPhongMaterial({ color: 0x2c2c2c }));
-                road.rotation.x = -Math.PI / 2;
-                segment.add(road);
-
-                // Trees
-                if (i % 8 === 0) {
-                    const side = (i % 16 === 0) ? 900 : -900;
-                    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(20, 25, 60, 6), new THREE.MeshPhongMaterial({ color: 0x8B5A2B }));
-                    trunk.position.set(side, 30, 0);
-                    segment.add(trunk);
-                    const top = new THREE.Mesh(new THREE.ConeGeometry(35, 80, 8), new THREE.MeshPhongMaterial({ color: 0x2c8c2c }));
-                    top.position.set(side, 80, 0);
-                    segment.add(top);
+            // Move obstacles and check collisions
+            for (let i = 0; i < obstacles.length; i++) {
+                obstacles[i].y += speed;
+                // Collision detection
+                if (obstacles[i].y + obstacles[i].height > canvas.height/2 - 30 && 
+                    obstacles[i].y < canvas.height/2 + 30 &&
+                    obstacles[i].x < truckX + truckWidth &&
+                    obstacles[i].x + obstacles[i].width > truckX) {
+                    gameRunning = false;
+                    startScreen.style.display = 'flex';
+                    startScreen.querySelector('h1').innerHTML = '💥 CRASH!';
+                    return;
                 }
+            }
+            // Remove off-screen obstacles
+            obstacles = obstacles.filter(obs => obs.y < canvas.height);
 
-                segment.position.z = -i * segmentLength;
-                roadGroup.add(segment);
-                roadSegments.push(segment);
+            // Spawn new obstacles
+            obstacleSpawnCounter++;
+            if (obstacleSpawnCounter > 30 / (speed/5)) {
+                obstacleSpawnCounter = 0;
+                spawnObstacle();
             }
 
-            // --- Controls ---
-            window.addEventListener('keydown', (e) => {
-                if (e.key === 'ArrowUp') speed = Math.min(speed + 0.02, 0.45);
-                if (e.key === 'ArrowLeft') targetRoadX = Math.min(targetRoadX + 35, 350);
-                if (e.key === 'ArrowRight') targetRoadX = Math.max(targetRoadX - 35, -350);
-            });
-            window.addEventListener('keyup', (e) => {
-                if (e.key === 'ArrowUp') speed = Math.max(speed - 0.015, 0);
-            });
-
-            // Start animation
-            animate();
+            // Score increases with speed
+            score += Math.floor(speed * 0.5);
+            updateUI();
         }
 
-        function animate() {
-            if (!scene) return;
-            requestAnimationFrame(animate);
+        function draw() {
+            // Clear canvas
+            ctx.fillStyle = '#2e7d32';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Physics
-            speed *= 0.995;
-            roadX += (targetRoadX - roadX) * 0.12;
+            // Draw road
+            ctx.fillStyle = '#2c2c2c';
+            ctx.fillRect(roadLeft, 0, roadWidth, canvas.height);
+            // Road markings
+            ctx.fillStyle = '#ffff00';
+            ctx.fillRect(roadLeft + roadWidth/2 - 5, 0, 10, canvas.height);
 
-            // Move road segments
-            const move = speed * 25000;
-            for (let seg of roadSegments) {
-                seg.position.z += move;
-                if (seg.position.z > 5000) seg.position.z -= roadSegments.length * 1200;
+            // Draw obstacles (rocks / barrels)
+            for (let obs of obstacles) {
+                ctx.fillStyle = '#8B5A2B';
+                ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+                ctx.fillStyle = '#654321';
+                ctx.fillRect(obs.x+5, obs.y+10, obs.width-10, 5);
             }
 
-            // Steer the world
-            roadGroup.position.x = roadX;
+            // Draw truck (simple rectangle)
+            ctx.fillStyle = '#D21034';
+            ctx.fillRect(truckX, canvas.height/2 - truckHeight/2, truckWidth, truckHeight);
+            ctx.fillStyle = '#00209F';
+            ctx.fillRect(truckX+10, canvas.height/2 - truckHeight/2 + 10, truckWidth-20, 20);
+            ctx.fillStyle = '#FFD700';
+            ctx.beginPath();
+            ctx.arc(truckX + truckWidth/2, canvas.height/2 - truckHeight/2 + 40, 15, 0, Math.PI*2);
+            ctx.fill();
 
-            // Steering wheel visual
-            if (wheel) wheel.rotation.z = -roadX * 0.006;
-
-            // Camera (driver's view)
-            camera.position.set(-60, 70, 150);
-            camera.lookAt(-60, 50, -1000);
-
-            // Cabin follows camera
-            cabin.position.copy(camera.position);
-            cabin.rotation.copy(camera.rotation);
-            cabin.translateZ(-180);
-            cabin.translateY(-60);
-
-            // Update HUD
-            const mph = Math.floor(speed * 1600);
-            document.getElementById('speed').innerText = mph;
-
-            renderer.render(scene, camera);
+            // Display speed and score
+            ctx.font = "20px monospace";
+            ctx.fillStyle = "white";
+            ctx.fillText("SPEED: " + Math.floor(speed*10), 10, 40);
+            ctx.fillText("SCORE: " + score, 10, 70);
         }
+
+        function gameLoop() {
+            if (gameRunning) {
+                update();
+                draw();
+            } else {
+                draw(); // draw final frame
+            }
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Keyboard controls
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') leftPressed = true;
+            if (e.key === 'ArrowRight') rightPressed = true;
+            if (e.key === 'ArrowUp') acceleratePressed = true;
+            if (e.key === ' ' && !gameRunning) {
+                startScreen.style.display = 'flex';
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft') leftPressed = false;
+            if (e.key === 'ArrowRight') rightPressed = false;
+            if (e.key === 'ArrowUp') acceleratePressed = false;
+        });
+
+        // Initial draw
+        draw();
     </script>
 </body>
 </html>
 """
 
-components.html(sim_html, height=850)
+components.html(game_html, height=700)
